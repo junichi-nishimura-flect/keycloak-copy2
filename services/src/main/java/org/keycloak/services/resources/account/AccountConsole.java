@@ -96,9 +96,15 @@ public class AccountConsole implements AccountResourceProvider {
     @NoCache
     @Path("{any:.*}")
     public Response getMainPage() throws IOException, FreeMarkerException {
+        // Get the URI info of the server and admin console.
         final var serverUriInfo = session.getContext().getUri(UrlType.FRONTEND);
+        final var adminUriInfo = session.getContext().getUri(UrlType.ADMIN);
+
+        // Get the base URLs of the server and admin console.
         final var serverBaseUri = serverUriInfo.getBaseUri();
-        // Strip any trailing slashes from the URL.
+        final var adminBaseUri = adminUriInfo.getBaseUri();
+
+        // Strip any trailing slashes from the URLs.
         final var serverBaseUrl = serverBaseUri.toString().replaceFirst("/+$", "");
 
         final var map = new HashMap<String, Object>();
@@ -118,7 +124,7 @@ public class AccountConsole implements AccountResourceProvider {
         map.put("realm", realm);
         map.put("clientId", Constants.ACCOUNT_CONSOLE_CLIENT_ID);
         map.put("resourceUrl", Urls.themeRoot(serverBaseUri).getPath() + "/" + Constants.ACCOUNT_MANAGEMENT_CLIENT_ID + "/" + theme.getName());
-        map.put("resourceCommonUrl", Urls.themeRoot(serverBaseUri).getPath() + "/common/keycloak");
+        map.put("resourceCommonUrl", Urls.themeRoot(adminBaseUri).getPath() + "/common/keycloak");
         map.put("resourceVersion", Version.RESOURCES_VERSION);
 
         String[] referrer = getReferrer();
