@@ -21,7 +21,7 @@
     <parent>
         <artifactId>keycloak-model-pom</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -30,10 +30,6 @@
     <description/>
 
     <properties>
-        <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-
         <keycloak.connectionsJpa.driver>org.h2.Driver</keycloak.connectionsJpa.driver>
         <keycloak.connectionsJpa.database>keycloak</keycloak.connectionsJpa.database>
         <keycloak.connectionsJpa.user>sa</keycloak.connectionsJpa.user>

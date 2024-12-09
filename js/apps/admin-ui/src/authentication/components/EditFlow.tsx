@@ -81,8 +81,8 @@ export const EditFlow = ({ execution, onRowChange }: EditFlowProps) => {
           >
             <FormProvider {...form}>
               <TextControl
-                name="name"
-                label={t("displayName")}
+                name="displayName"
+                label={t("name")}
                 labelIcon={t("flowNameHelp")}
                 rules={{ required: { value: true, message: t("required") } }}
               />

@@ -70,7 +70,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -209,7 +208,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
     @Override
     public void addConsent(RealmModel realm, String userId, UserConsentModel consent) {
         String clientId = consent.getClient().getId();
-        
+
         long currentTime = Time.currentTimeMillis();
 
         UserConsentEntity consentEntity = new UserConsentEntity();
@@ -295,7 +294,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
             return null;
         }
 
-        StorageId clientStorageId = null;
+        StorageId clientStorageId;
         if ( entity.getClientId() == null) {
             clientStorageId = new StorageId(entity.getClientStorageProvider(), entity.getExternalClientId());
         } else {
@@ -621,12 +620,12 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         List<Predicate> predicates = new ArrayList<>();
 
         predicates.add(builder.equal(root.get("realmId"), realm.getId()));
-        
+
         for (String stringToSearch : search.trim().split("\\s+")) {
             predicates.add(builder.or(getSearchOptionPredicateArray(stringToSearch, builder, root)));
         }
-        
-        queryBuilder.where(predicates.toArray(new Predicate[0]));
+
+        queryBuilder.where(predicates.toArray(Predicate[]::new));
 
         return em.createQuery(queryBuilder).getSingleResult().intValue();
     }
@@ -648,14 +647,14 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         List<Predicate> predicates = new ArrayList<>();
 
         predicates.add(builder.equal(userJoin.get("realmId"), realm.getId()));
-        
+
         for (String stringToSearch : search.trim().split("\\s+")) {
             predicates.add(builder.or(getSearchOptionPredicateArray(stringToSearch, builder, userJoin)));
         }
-        
+
         predicates.add(groupMembership.get("groupId").in(groupIds));
 
-        queryBuilder.where(predicates.toArray(new Predicate[0]));
+        queryBuilder.where(predicates.toArray(Predicate[]::new));
 
         return em.createQuery(queryBuilder).getSingleResult().intValue();
     }
@@ -671,7 +670,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         List<Predicate> restrictions = predicates(params, from, Map.of());
         restrictions.add(qb.equal(from.get("realmId"), realm.getId()));
 
-        userQuery = userQuery.where(restrictions.toArray(new Predicate[0]));
+        userQuery = userQuery.where(restrictions.toArray(Predicate[]::new));
         TypedQuery<Long> query = em.createQuery(userQuery);
         Long result = query.getSingleResult();
 
@@ -693,10 +692,10 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
 
         List<Predicate> restrictions = predicates(params, root, Map.of());
         restrictions.add(cb.equal(root.get("realmId"), realm.getId()));
-        
+
         groupsWithPermissionsSubquery(countQuery, groupIds, root, restrictions);
 
-        countQuery.where(restrictions.toArray(new Predicate[0]));
+        countQuery.where(restrictions.toArray(Predicate[]::new));
         TypedQuery<Long> query = em.createQuery(countQuery);
         Long result = query.getSingleResult();
 
@@ -733,7 +732,10 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         TypedQuery<UserEntity> query = em.createNamedQuery("usersInRole", UserEntity.class);
         query.setParameter("roleId", role.getId());
 
-        return closing(paginateQuery(query, firstResult, maxResults).getResultStream().map(user -> new UserAdapter(session, realm, em, user)));
+        final UserProvider users = session.users();
+        return closing(paginateQuery(query, firstResult, maxResults).getResultStream())
+                .map(userEntity -> users.getUserById(realm, userEntity.getId()))
+                .filter(Objects::nonNull);
     }
 
     @Override
@@ -950,7 +952,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
             orPredicates.add(builder.like(builder.lower(from.get(LAST_NAME)), value, ESCAPE_BACKSLASH));
         }
 
-        return orPredicates.toArray(new Predicate[0]);
+        return orPredicates.toArray(Predicate[]::new);
     }
 
     private UserEntity userInEntityManagerContext(String id) {
@@ -1025,9 +1027,15 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
                                 builder.equal(attributesJoin.get("name"), key),
                                 builder.equal(attributesJoin.get("longValueHashLowerCase"), JpaHashUtils.hashForAttributeValueLowerCase(value))));
                     } else {
-                        attributePredicates.add(builder.and(
+                        if (Boolean.parseBoolean(attributes.get(UserModel.EXACT))) {
+                            attributePredicates.add(builder.and(
                                 builder.equal(attributesJoin.get("name"), key),
                                 builder.equal(builder.lower(attributesJoin.get("value")), value.toLowerCase())));
+                        } else {
+                            attributePredicates.add(builder.and(
+                                builder.equal(attributesJoin.get("name"), key),
+                                builder.like(builder.lower(attributesJoin.get("value")), "%" + value.toLowerCase() + "%")));
+                        }
                     }
                     break;
                 case UserModel.INCLUDE_SERVICE_ACCOUNT: {
@@ -1041,7 +1049,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         }
 
         if (!attributePredicates.isEmpty()) {
-            predicates.add(builder.and(attributePredicates.toArray(new Predicate[0])));
+            predicates.add(builder.and(attributePredicates.toArray(Predicate[]::new)));
         }
 
         return predicates;
@@ -1052,7 +1060,7 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         CriteriaBuilder cb = em.getCriteriaBuilder();
 
         Subquery subquery = query.subquery(String.class);
-        
+
         Root<UserGroupMembershipEntity> from = subquery.from(UserGroupMembershipEntity.class);
 
         subquery.select(cb.literal(1));
@@ -1072,11 +1080,11 @@ public class JpaUserProvider implements UserProvider, UserCredentialStore {
         Expression<String> groupId = from.get("groupId");
         subs.add(cb.like(from1.get("name"), cb.concat("group.resource.", groupId)));
 
-        subquery1.where(subs.toArray(new Predicate[0]));
+        subquery1.where(subs.toArray(Predicate[]::new));
 
         subPredicates.add(cb.exists(subquery1));
 
-        subquery.where(subPredicates.toArray(new Predicate[0]));
+        subquery.where(subPredicates.toArray(Predicate[]::new));
 
         restrictions.add(cb.exists(subquery));
     }

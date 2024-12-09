@@ -20,7 +20,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <name>Keycloak Quarkus Parent</name>
@@ -32,23 +32,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
-        <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
     </properties>
-
-    <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-compiler-plugin</artifactId>
-                    <version>${maven.compiler.plugin.version}</version>
-                </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
     
     <modules>
         <module>config-api</module>
@@ -58,6 +42,34 @@
         <module>dist</module>
         <module>tests</module>
     </modules>
+
+    <!-- Remove once Quarkus Micrometer extension uses Micrometer 1.13.5-->
+    <!-- See https://github.com/keycloak/keycloak/issues/33469 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-core</artifactId>
+                <version>1.13.5</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-commons</artifactId>
+                <version>1.13.5</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-observation</artifactId>
+                <version>1.13.5</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus-simpleclient</artifactId>
+                <version>1.13.5</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <!-- Remove until here  -->
 
     <repositories>
         <repository>

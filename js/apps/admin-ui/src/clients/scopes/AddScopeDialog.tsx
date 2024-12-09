@@ -22,8 +22,8 @@ import {
   ClientScopeType,
   clientScopeTypesDropdown,
 } from "../../components/client-scope/ClientScopeTypes";
-import { ListEmptyState } from "../../components/list-empty-state/ListEmptyState";
-import { KeycloakDataTable } from "../../components/table-toolbar/KeycloakDataTable";
+import { ListEmptyState } from "@keycloak/keycloak-ui-shared";
+import { KeycloakDataTable } from "@keycloak/keycloak-ui-shared";
 import useToggle from "../../utils/useToggle";
 import { getProtocolName } from "../utils";
 
@@ -169,6 +169,7 @@ export const AddScopeDialog = ({
                 popperProps={{
                   direction: "up",
                 }}
+                onOpenChange={(isOpen) => setAddToggle(isOpen)}
                 className="keycloak__client-scopes-add__add-dropdown"
                 key="add-dropdown"
                 isOpen={addToggle}
@@ -215,6 +216,7 @@ export const AddScopeDialog = ({
             onSelect={() => {
               onFilterTypeDropdownSelect(filterType);
             }}
+            onOpenChange={toggleIsFilterTypeDropdownOpen}
             toggle={(ref) => (
               <MenuToggle
                 ref={ref}
@@ -246,6 +248,7 @@ export const AddScopeDialog = ({
                 onSelect={() => {
                   onFilterTypeDropdownSelect(filterType);
                 }}
+                onOpenChange={toggleIsFilterTypeDropdownOpen}
                 data-testid="filter-type-dropdown"
                 toggle={(ref) => (
                   <MenuToggle

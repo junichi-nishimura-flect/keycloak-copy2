@@ -51,7 +51,22 @@ public class KeycloakQuarkusServerDeployableContainer extends AbstractQuarkusDep
             logProcessor = new LogProcessor(new BufferedReader(new InputStreamReader(container.getInputStream())));
             stdoutForwarderThread = new Thread(logProcessor);
             stdoutForwarderThread.start();
-            waitForReadiness();
+
+            try {
+                waitForReadiness();
+            } catch (Exception e) {
+                if (logProcessor.containsBuildTimeOptionsError()) {
+                    log.warn("The build time options have values that differ from what is persisted. Restarting container...");
+                    container.destroy();
+                    container = startContainer();
+                    logProcessor = new LogProcessor(new BufferedReader(new InputStreamReader(container.getInputStream())));
+                    stdoutForwarderThread = new Thread(logProcessor);
+                    stdoutForwarderThread.start();
+                    waitForReadiness();
+                } else {
+                    throw e;
+                }
+            }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -83,8 +98,8 @@ public class KeycloakQuarkusServerDeployableContainer extends AbstractQuarkusDep
         ProcessBuilder pb = new ProcessBuilder(commands);
         Process p = pb.directory(wrkDir).inheritIO().start();
         try {
-            if (!p.waitFor(60, TimeUnit.SECONDS)) {
-                throw new IOException("Command " + command + " did not finished in 60 seconds");
+            if (!p.waitFor(300, TimeUnit.SECONDS)) {
+                throw new IOException("Command " + command + " did not finished in 300 seconds");
             }
             if (p.exitValue() != 0) {
                 throw new IOException("Command " + command + " was executed with exit status " + p.exitValue());
@@ -151,8 +166,8 @@ public class KeycloakQuarkusServerDeployableContainer extends AbstractQuarkusDep
         }
 
         if (!StoreProvider.JPA.equals(StoreProvider.getCurrentProvider())) {
-            builder.environment().put("KEYCLOAK_ADMIN", "admin");
-            builder.environment().put("KEYCLOAK_ADMIN_PASSWORD", "admin");
+            builder.environment().put("KC_BOOTSTRAP_ADMIN_USERNAME", "admin");
+            builder.environment().put("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin");
         }
 
         if (restart.compareAndSet(false, true)) {
@@ -285,14 +300,17 @@ public class KeycloakQuarkusServerDeployableContainer extends AbstractQuarkusDep
                         loggedLines.remove(0);
                     }
                 }
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
 
         public String getBufferedLog() {
             return String.join("\n", loggedLines);
+        }
+
+        public boolean containsBuildTimeOptionsError() {
+            return loggedLines.stream().anyMatch(line -> line.contains("The following build time options have values that differ from what is persisted"));
         }
     }
 }

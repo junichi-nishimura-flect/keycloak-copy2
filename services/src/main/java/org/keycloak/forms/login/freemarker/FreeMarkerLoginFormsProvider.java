@@ -27,6 +27,7 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 import org.keycloak.authentication.authenticators.browser.OTPFormAuthenticator;
+import org.keycloak.authentication.forms.RegistrationPage;
 import org.keycloak.authentication.requiredactions.util.UpdateProfileContext;
 import org.keycloak.authentication.requiredactions.util.UserUpdateProfileContext;
 import org.keycloak.broker.provider.BrokeredIdentityContext;
@@ -47,6 +48,8 @@ import org.keycloak.forms.login.freemarker.model.IdpReviewProfileBean;
 import org.keycloak.forms.login.freemarker.model.LoginBean;
 import org.keycloak.forms.login.freemarker.model.LogoutConfirmBean;
 import org.keycloak.forms.login.freemarker.model.OAuthGrantBean;
+import org.keycloak.forms.login.freemarker.model.OrganizationBean;
+import org.keycloak.forms.login.freemarker.model.PasswordPoliciesBean;
 import org.keycloak.forms.login.freemarker.model.ProfileBean;
 import org.keycloak.forms.login.freemarker.model.RealmBean;
 import org.keycloak.forms.login.freemarker.model.RecoveryAuthnCodeInputLoginBean;
@@ -61,8 +64,8 @@ import org.keycloak.forms.login.freemarker.model.VerifyProfileBean;
 import org.keycloak.forms.login.freemarker.model.X509ConfirmBean;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
-import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.OrganizationModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.FormMessage;
@@ -101,6 +104,7 @@ import java.util.Properties;
 import java.util.function.Function;
 
 import static org.keycloak.models.UserModel.RequiredAction.UPDATE_PASSWORD;
+import static org.keycloak.organization.utils.Organizations.resolveOrganization;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -476,12 +480,10 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
         if (realm != null) {
             attributes.put("realm", new RealmBean(realm));
 
-            List<IdentityProviderModel> identityProviders = LoginFormsUtil
-                    .filterIdentityProvidersForTheme(realm.getIdentityProvidersStream(), session, context);
-            IdentityProviderBean idpBean = new IdentityProviderBean(realm, session, identityProviders, baseUriWithCodeAndClientId);
+            IdentityProviderBean idpBean = new IdentityProviderBean(session, realm, baseUriWithCodeAndClientId, context);
 
-            if (Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
-                idpBean = new OrganizationAwareIdentityProviderBean(idpBean, session);
+            if (Profile.isFeatureEnabled(Feature.ORGANIZATION) && realm.isOrganizationsEnabled()) {
+                idpBean = new OrganizationAwareIdentityProviderBean(idpBean);
             }
 
             attributes.put("social", idpBean);
@@ -496,6 +498,7 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
                     switch (page) {
                         case LOGIN:
                         case LOGIN_USERNAME:
+                        case LOGIN_WEBAUTHN:
                         case X509_CONFIRM:
                             b = UriBuilder.fromUri(Urls.realmLoginPage(baseUri, realm.getName()));
                             break;
@@ -540,6 +543,15 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
 
                 attributes.put("locale", new LocaleBean(realm, locale, b, messagesBundle));
             }
+
+            if (Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
+                OrganizationModel organization = resolveOrganization(session, user);
+
+                if (organization != null) {
+                    attributes.put("org", new OrganizationBean(organization, user));
+                }
+            }
+            attributes.put("passwordPolicies", new PasswordPoliciesBean(realm.getPasswordPolicy()));
         }
         if (realm != null && user != null && session != null) {
             attributes.put("authenticatorConfigured", new AuthenticatorConfiguredMethod(realm, user, session));
@@ -635,6 +647,17 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
                 if (value == null || value.trim().isEmpty()) {
                     this.formData.putSingle("username", loginHint);
                 }
+            }
+        }
+
+        if (Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
+            String email = (String) attributes.get(RegistrationPage.FIELD_EMAIL);
+            if (this.formData == null) {
+                this.formData = new MultivaluedHashMap<>();
+            }
+            String value = this.formData.getFirst(RegistrationPage.FIELD_EMAIL);
+            if (value == null || value.trim().isEmpty()) {
+                this.formData.putSingle(RegistrationPage.FIELD_EMAIL, email);
             }
         }
 

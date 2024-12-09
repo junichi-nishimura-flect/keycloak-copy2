@@ -31,6 +31,7 @@ import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.organization.utils.Organizations;
 import org.keycloak.protocol.AuthorizationEndpointBase;
 import org.keycloak.protocol.oidc.OIDCAdvancedConfigWrapper;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
@@ -49,6 +50,7 @@ import org.keycloak.services.clientpolicy.context.PreAuthorizationRequestContext
 import org.keycloak.services.messages.Messages;
 import org.keycloak.services.resources.LoginActionsService;
 import org.keycloak.services.util.CacheControlUtil;
+import org.keycloak.services.util.LocaleUtil;
 import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.util.TokenUtil;
 
@@ -205,11 +207,19 @@ public class AuthorizationEndpoint extends AuthorizationEndpointBase {
         throw new RuntimeException("Unknown action " + action);
     }
 
-    public AuthorizationEndpoint register() {
+    public AuthorizationEndpoint register(String tokenString) {
         event.event(EventType.REGISTER);
         action = Action.REGISTER;
 
-        if (!realm.isRegistrationAllowed()) {
+        if (Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION) && tokenString != null) {
+            //this call should extract orgId from token and set the organization to the session context
+            Response errorResponse = new LoginActionsService(session, event).preHandleActionToken(tokenString);
+            if (errorResponse != null) {
+                throw new ErrorPageException(errorResponse);
+            }
+        }
+
+        if (!Organizations.isRegistrationAllowed(session, realm)) {
             throw new ErrorPageException(session, authenticationSession, Response.Status.BAD_REQUEST, Messages.REGISTRATION_NOT_ALLOWED);
         }
 
@@ -268,6 +278,8 @@ public class AuthorizationEndpoint extends AuthorizationEndpointBase {
     }
 
     private Response redirectErrorToClient(OIDCResponseMode responseMode, String error, String errorDescription) {
+        CacheControlUtil.noBackButtonCacheControlHeader(session);
+
         OIDCRedirectUriBuilder errorResponseBuilder = OIDCRedirectUriBuilder.fromUri(redirectUri, responseMode, session, null)
                 .addParam(OAuth2Constants.ERROR, error);
 
@@ -349,6 +361,7 @@ public class AuthorizationEndpoint extends AuthorizationEndpointBase {
 
         AuthenticationProcessor processor = createProcessor(authenticationSession, flowId, LoginActionsService.REGISTRATION_PATH);
         authenticationSession.setClientNote(APP_INITIATED_FLOW, LoginActionsService.REGISTRATION_PATH);
+        LocaleUtil.processLocaleParam(session, realm, authenticationSession);
 
         return processor.authenticate();
     }

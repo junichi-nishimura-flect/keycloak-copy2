@@ -18,6 +18,8 @@ Distributed environments frequently require the use of a reverse proxy. {project
 * `forwarded` enables parsing of the `Forwarded` header as per https://www.rfc-editor.org/rfc/rfc7239.html[RFC7239].
 * `xforwarded` enables parsing of non-standard `X-Forwarded-*` headers, such as `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Port`.
 
+NOTE: If you are using a reverse proxy for anything other than https passthrough and do not set the `proxy-headers` option, then by default you will see 403 Forbidden responses to requests via the proxy that perform origin checking.
+
 For example:
 
 <@kc.start parameters="--proxy-headers forwarded"/>
@@ -29,30 +31,7 @@ If this header is incorrectly configured, rogue clients can set this header and 
 
 NOTE: When using the `xforwarded` setting, the `X-Forwarded-Port` takes precedence over any port included in the `X-Forwarded-Host`.
 
-== Proxy modes (deprecated)
-NOTE: The support for setting proxy modes is deprecated and will be removed in a future {project_name} release. Consider configuring accepted reverse proxy headers instead as described in the chapter above. For migration instructions consult the https://www.keycloak.org/docs/latest/upgrading/index.html#deprecated-proxy-option[Upgrading Guide].
-
-For {project_name}, your choice of proxy modes depends on the TLS termination in your environment. The following proxy modes are available:
-
-edge:: Enables communication through HTTP between the proxy and {project_name}.
-This mode is suitable for deployments with a highly secure internal network where the reverse proxy keeps a secure connection (HTTP over TLS) with clients while communicating with {project_name} using HTTP.
-
-reencrypt:: Requires communication through HTTPS between the proxy and {project_name}.
-This mode is suitable for deployments where internal communication between the reverse proxy and {project_name} should also be protected.
-Different keys and certificates are used on the reverse proxy as well as on {project_name}.
-
-passthrough:: The proxy forwards the HTTPS connection to {project_name} without terminating TLS.
-The secure connections between the server and clients are based on the keys and certificates used by the {project_name} server.
-
-When in **edge** or **reencrypt** proxy mode, {project_name} will parse the following headers and expects the reverse proxy to set them:
-
-* `Forwarded` as per https://www.rfc-editor.org/rfc/rfc7239.html[RFC7239]
-* Non-standard `X-Forwarded-*`, such as `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Port`
-
-=== Configure the proxy mode in {project_name}
-To select the proxy mode, enter this command:
-
-<@kc.start parameters="--proxy <mode>"/>
+NOTE: If the TLS connection is terminated at the reverse proxy (edge termination), enabling HTTP through the ‘http-enabled’ setting is required.
 
 == Different context-path on reverse proxy
 
@@ -69,7 +48,7 @@ Typical cluster deployment consists of the load balancer (reverse proxy) and 2 o
 For performance purposes, it may be useful if load balancer forwards all requests related to particular browser session to the same {project_name} backend node.
 
 The reason is, that {project_name} is using Infinispan distributed cache under the covers for save data related to current authentication session and user session.
-The Infinispan distributed caches are configured with two owners by default. That means that particular session is primarily stored on two cluster nodes and the other nodes need to lookup the session remotely if they want to access it.
+The Infinispan distributed caches are configured with limited number of owners. That means that session related data are stored only in some cluster nodes and the other nodes need to lookup the data remotely if they want to access it.
 
 For example if authentication session with ID 123 is saved in the Infinispan cache on node1, and then node2 needs to lookup this session, it needs to send the request to node1 over the network to return the particular session entity.
 
@@ -117,11 +96,6 @@ The following table shows the recommended paths to expose.
 |No
 |Exposed admin paths lead to an unnecessary attack vector.
 
-|/js/
-| -
-|Yes (see note below)
-|Access to keycloak.js needed for "internal" clients, e.g. the account console
-
 |/realms/
 |/realms/
 |Yes
@@ -149,11 +123,26 @@ The following table shows the recommended paths to expose.
 
 |===
 
-[NOTE]
-As it's true that the `js` path is needed for internal clients like the account console, it's good practice to use `keycloak.js` from a JavaScript package manager like npm or yarn for your external clients.
-
 We assume you run {project_name} on the root path `/` on your reverse proxy/gateway's public API.
 If not, prefix the path with your desired one.
+
+== Trusted Proxies
+
+To ensure that proxy headers are used only from proxies you trust, set the `proxy-trusted-addresses` option to a comma separated list of IP addresses (IPv4 or IPv6) or Classless Inter-Domain Routing (CIDR) notations.
+
+For example:
+
+<@kc.start parameters="--proxy-headers forwarded --proxy-trusted-addresses=192.168.0.32,127.0.0.0/8"/> 
+
+== PROXY Protocol
+
+The `proxy-protocol-enabled` option controls whether the server should use the HA PROXY protocol when serving requests from behind a proxy. When set to true, the remote address returned will be the one from the actual connecting client.
+
+This is useful when running behind a compatible https passthrough proxy because the request headers cannot be manipulated.
+
+For example:
+
+<@kc.start parameters="--proxy-protocol-enabled true"/> 
 
 == Enabling client certificate lookup
 

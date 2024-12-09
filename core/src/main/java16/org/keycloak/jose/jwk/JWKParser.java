@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Red Hat, Inc. and/or its affiliates
+ * Copyright 2016 Red Hat, Inc. and/or its affiliates
  * and other contributors as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +32,7 @@ import org.keycloak.crypto.KeyType;
 import org.keycloak.util.JsonSerialization;
 
 /**
- * @author <a href="mailto:takashi.norimatsu.ws@hitachi.com">Takashi Norimatsu</a>
+ * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
  */
 public class JWKParser extends AbstractJWKParser {
 
@@ -62,12 +62,15 @@ public class JWKParser extends AbstractJWKParser {
 
     @Override
     public PublicKey toPublicKey() {
+        if (jwk == null) {
+            throw new IllegalStateException("Not possible to convert to the publicKey. The jwk is not set");
+        }
         String keyType = jwk.getKeyType();
-        if (keyType.equals(KeyType.RSA)) {
+        if (KeyType.RSA.equals(keyType)) {
             return createRSAPublicKey();
-        } else if (keyType.equals(KeyType.EC)) {
+        } else if (KeyType.EC.equals(keyType)) {
             return createECPublicKey();
-        } else if (keyType.equals(KeyType.OKP)) {
+        } else if (KeyType.OKP.equals(keyType)) {
             return createOKPPublicKey();
         } else {
             throw new RuntimeException("Unsupported keyType " + keyType);

@@ -34,10 +34,9 @@ import static org.keycloak.client.cli.util.ConfigUtil.getHandler;
 import static org.keycloak.client.cli.util.ConfigUtil.loadConfig;
 import static org.keycloak.client.cli.util.ConfigUtil.saveTokens;
 import static org.keycloak.client.cli.util.IoUtil.printErr;
-import static org.keycloak.client.cli.util.IoUtil.readSecret;
 import static org.keycloak.client.cli.util.OsUtil.OS_ARCH;
 import static org.keycloak.client.cli.util.OsUtil.PROMPT;
-
+import static org.keycloak.common.util.IoUtils.readPasswordFromConsole;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -107,11 +106,11 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
             	password = System.getenv("KC_CLI_PASSWORD");
             }
             if (password == null) {
-                password = readSecret("Enter password: ");
+                password = readPasswordFromConsole("password");
             }
             // if secret was set to be read from stdin, then ask for it
             if ("-".equals(secret) && keystore == null) {
-                secret = readSecret("Enter client secret: ");
+                secret = readPasswordFromConsole("client secret");
             }
         } else if (keystore != null || secret != null || clientSet) {
             grantTypeForAuthentication = OAuth2Constants.CLIENT_CREDENTIALS;
@@ -119,7 +118,7 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
             if (keystore == null && secret == null) {
             	secret = System.getenv("KC_CLI_CLIENT_SECRET");
             	if (secret == null) {
-            		secret = readSecret("Enter client secret: ");
+                    secret = readPasswordFromConsole("client secret");
             	}
             }
         }
@@ -139,11 +138,11 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
             if (keyPass == null) {
             	keyPass = System.getenv("KC_CLI_KEY_PASSWORD");
             }
-            
+
             if (storePass == null) {
-                storePass = readSecret("Enter keystore password: ");
+                storePass = readPasswordFromConsole("keystore password");
                 if (keyPass == null) {
-                	keyPass = readSecret("Enter key password: ");
+                	keyPass = readPasswordFromConsole("key password");
                 }
             }
 
@@ -193,6 +192,7 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
         out.println("       " + getCommand() + " config credentials --server SERVER_URL --realm REALM --user USER [--password PASSWORD] [ARGUMENTS]");
         out.println("       " + getCommand() + " config credentials --server SERVER_URL --realm REALM --client CLIENT_ID [--secret SECRET] [ARGUMENTS]");
         out.println("       " + getCommand() + " config credentials --server SERVER_URL --realm REALM --client CLIENT_ID [--keystore KEYSTORE] [ARGUMENTS]");
+        out.println("       " + getCommand() + " config credentials --status");
         out.println();
         out.println("Command to establish an authenticated client session with the server. There are many authentication");
         out.println("options available, and it depends on server side client authentication configuration how client can or should authenticate.");
@@ -202,6 +202,8 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
         out.println("If confidential client authentication is also configured, you may have to specify a client id, and client credentials in addition to");
         out.println("user credentials. Client credentials are either a client secret, or a keystore information to use Signed JWT mechanism.");
         out.println("If only client credentials are provided, and no user credentials, then the service account is used for login.");
+        out.println("If validity of the authentication needs to be checked use the --status option. This would only check the status of the existing config and does not update the config.");
+        out.println("Other arguments which are passed along with status are ignored");
         out.println();
         out.println("Arguments:");
         out.println();
@@ -223,6 +225,7 @@ public class BaseConfigCredentialsCmd extends BaseAuthOptionsCmd {
         out.println("    --keypass PASSWORD      Key password (prompted for if not specified, --keystore is used without --storepass, and KC_CLI_KEY_PASSWORD");
         out.println("                            otherwise defaults to keystore password)");
         out.println("    --alias ALIAS           Alias of the key inside a keystore (defaults to the value of ClientId)");
+        out.println("    --status                Checks the validity of the existing connection (Note: It does not update the config)");
         out.println();
         out.println();
         out.println("Examples:");

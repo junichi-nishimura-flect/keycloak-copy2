@@ -17,7 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAdminClient } from "../../admin-client";
 import { DraggableTable } from "../../authentication/components/DraggableTable";
 import { useConfirmDialog } from "../../components/confirm-dialog/ConfirmDialog";
-import { KeycloakSpinner } from "../../components/keycloak-spinner/KeycloakSpinner";
+import { KeycloakSpinner } from "@keycloak/keycloak-ui-shared";
 import { useRealm } from "../../context/realm-context/RealmContext";
 import useLocale from "../../utils/useLocale";
 import useToggle from "../../utils/useToggle";
@@ -92,7 +92,7 @@ export const AttributesTab = ({ setTableData }: AttributesTabProps) => {
                   });
                 setTableData([updatedData]);
               }
-            } catch (error) {
+            } catch {
               console.error(`Error removing translations for ${locale}`);
             }
           }),
@@ -245,7 +245,6 @@ export const AttributesTab = ({ setTableData }: AttributesTabProps) => {
           {
             title: t("delete"),
             isActionable: ({ name }) => !RESTRICTED_ATTRIBUTES.includes(name!),
-            isDisabled: RESTRICTED_ATTRIBUTES.includes(name!),
             onClick: (_key, _idx, component) => {
               setAttributeToDelete(component.name);
               toggleDeleteDialog();

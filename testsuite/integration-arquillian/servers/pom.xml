@@ -21,7 +21,7 @@
     <parent>
         <groupId>org.keycloak.testsuite</groupId>
         <artifactId>integration-arquillian</artifactId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -44,7 +44,6 @@
     </properties>
 
     <modules>
-        <module>adapter-spi</module>
         <module>auth-server</module>
         <module>app-server</module>
         <module>cache-server</module>

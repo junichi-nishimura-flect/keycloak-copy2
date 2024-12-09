@@ -21,7 +21,7 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -50,7 +50,6 @@
         </plugins>
     </build>
     <modules>
-        <module>db-allocator-plugin</module>
         <module>integration-arquillian</module>
         <module>model</module>
         <module>utils</module>

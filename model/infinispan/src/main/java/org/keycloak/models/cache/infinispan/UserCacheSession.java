@@ -24,7 +24,7 @@ import org.keycloak.credential.CredentialInput;
 import org.keycloak.models.ClientScopeModel;
 import org.keycloak.models.CredentialValidationOutput;
 import org.keycloak.models.IdentityProviderModel;
-import org.keycloak.models.OrganizationModel;
+import org.keycloak.models.cache.infinispan.events.CacheKeyInvalidatedEvent;
 import org.keycloak.models.cache.infinispan.events.InvalidationEvent;
 import org.keycloak.common.constants.ServiceAccountConstants;
 import org.keycloak.component.ComponentModel;
@@ -112,7 +112,7 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
     public void clear() {
         cache.clear();
         ClusterProvider cluster = session.getProvider(ClusterProvider.class);
-        cluster.notify(InfinispanUserCacheProviderFactory.USER_CLEAR_CACHE_EVENTS, new ClearCacheEvent(), true, ClusterProvider.DCNotify.ALL_DCS);
+        cluster.notify(InfinispanUserCacheProviderFactory.USER_CLEAR_CACHE_EVENTS, ClearCacheEvent.getInstance(), true, ClusterProvider.DCNotify.ALL_DCS);
     }
 
     public UserProvider getDelegate() {
@@ -214,7 +214,7 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
         if (cached != null && !cached.getRealm().equals(realm.getId())) {
             cached = null;
         }
-        
+
         UserModel adapter = null;
         if (cached == null) {
             logger.trace("not cached");
@@ -339,29 +339,20 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
     protected UserModel cacheUser(RealmModel realm, UserModel delegate, Long revision) {
         int notBefore = getDelegate().getNotBeforeOfUser(realm, delegate);
 
-        if (Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION)) {
-            // check if provider is enabled and user is managed member of a disabled organization OR provider is disabled and user is managed member
-            OrganizationProvider organizationProvider = session.getProvider(OrganizationProvider.class);
-            OrganizationModel organization = organizationProvider.getByMember(delegate);
-
-            if ((organizationProvider.isEnabled() && organization != null && organization.isManaged(delegate) && !organization.isEnabled()) || 
-                    (!organizationProvider.isEnabled() && organization != null && organization.isManaged(delegate))) {
-                return new ReadOnlyUserModelDelegate(delegate) {
-                    @Override
-                    public boolean isEnabled() {
-                        return false;
-                    }
-                };
-            }
+        if (isReadOnlyOrganizationMember(delegate)) {
+            return new ReadOnlyUserModelDelegate(delegate) {
+                @Override
+                public boolean isEnabled() {
+                    return false;
+                }
+            };
         }
 
-        StorageId storageId = delegate.getFederationLink() != null ?
-                new StorageId(delegate.getFederationLink(), delegate.getId()) : new StorageId(delegate.getId());
-        CachedUser cached = null;
-        UserAdapter adapter = null;
+        CachedUser cached;
+        UserAdapter adapter;
 
-        if (!storageId.isLocal()) {
-            ComponentModel component = realm.getComponent(storageId.getProviderId());
+        if (delegate.getFederationLink() != null) {
+            ComponentModel component = realm.getComponent(delegate.getFederationLink());
             UserStorageProviderModel model = new UserStorageProviderModel(component);
             if (!model.isEnabled()) {
                 return new ReadOnlyUserModelDelegate(delegate) {
@@ -509,7 +500,7 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
     @Override
     public Stream<UserModel> getRoleMembersStream(RealmModel realm, RoleModel role) {
         return getDelegate().getRoleMembersStream(realm, role);
-    }    
+    }
 
     @Override
     public UserModel getServiceAccount(ClientModel client) {
@@ -841,6 +832,10 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
 
     // just in case the transaction is rolled back you need to invalidate the user and all cache queries for that user
     protected void fullyInvalidateUser(RealmModel realm, UserModel user) {
+        if (user instanceof CachedUserModel) {
+           ((CachedUserModel) user).invalidate();
+        }
+
         Stream<FederatedIdentityModel> federatedIdentities = realm.isIdentityFederationEnabled() ?
                 getFederatedIdentitiesStream(realm, user) : Stream.empty();
 
@@ -852,7 +847,7 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
 
     @Override
     public boolean removeUser(RealmModel realm, UserModel user) {
-         fullyInvalidateUser(realm, user);
+        fullyInvalidateUser(realm, user);
         return getDelegate().removeUser(realm, user);
     }
 
@@ -980,5 +975,43 @@ public class UserCacheSession implements UserCache, OnCreateComponent, OnUpdateC
             return ((UserProfileDecorator) getDelegate()).decorateUserProfile(providerId, metadata);
         }
         return List.of();
+    }
+
+    private boolean isReadOnlyOrganizationMember(UserModel delegate) {
+        if (delegate == null) {
+            return false;
+        }
+
+        if (!Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION)) {
+            return false;
+        }
+
+        OrganizationProvider organizationProvider = session.getProvider(OrganizationProvider.class);
+
+        if (organizationProvider.count() == 0) {
+            return false;
+        }
+
+        // check if provider is enabled and user is managed member of a disabled organization OR provider is disabled and user is managed member
+        return organizationProvider.getByMember(delegate)
+                .anyMatch((org) -> (organizationProvider.isEnabled() && org.isManaged(delegate) && !org.isEnabled()) ||
+                        (!organizationProvider.isEnabled() && org.isManaged(delegate)));
+    }
+
+    public UserCacheManager getCache() {
+        return cache;
+    }
+
+    public long getStartupRevision() {
+        return startupRevision;
+    }
+
+    public void registerInvalidation(String id) {
+        cache.invalidateCacheKey(id, invalidations);
+        invalidationEvents.add(new CacheKeyInvalidatedEvent(id));
+    }
+
+    public boolean isInvalid(String key) {
+        return invalidations.contains(key);
     }
 }

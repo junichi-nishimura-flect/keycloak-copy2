@@ -21,6 +21,7 @@ export const SingleSelect = ({
   maxHeight,
   toggleIcon,
   className,
+  isDisabled,
   children,
   ...props
 }: SingleSelectProps) => {
@@ -54,7 +55,7 @@ export const SingleSelect = ({
       }}
       {...props}
       onClick={toggle}
-      onOpenChange={() => setOpen(false)}
+      onOpenChange={(isOpen) => setOpen(isOpen)}
       selected={selections}
       onSelect={(_, value) => {
         onSelect?.(value || "");
@@ -69,6 +70,7 @@ export const SingleSelect = ({
           isExpanded={isOpen}
           aria-label={props["aria-label"]}
           icon={toggleIcon}
+          isDisabled={isDisabled}
           isFullWidth
         >
           {childArray.find((c) => c.props.value === selections)?.props

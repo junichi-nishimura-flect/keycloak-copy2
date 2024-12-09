@@ -7,7 +7,7 @@
     <parent>
         <artifactId>keycloak-quarkus-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     
@@ -62,6 +62,7 @@
                     <finalName>keycloak</finalName>
                     <systemProperties>
                         <kc.home.dir>${kc.home.dir}</kc.home.dir>
+                        <java.util.concurrent.ForkJoinPool.common.threadFactory>io.quarkus.bootstrap.forkjoin.QuarkusForkJoinWorkerThreadFactory</java.util.concurrent.ForkJoinPool.common.threadFactory>
                     </systemProperties>
                 </configuration>
                 <executions>

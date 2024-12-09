@@ -29,11 +29,13 @@ public class OrganizationRepresentation {
 
     private String id;
     private String name;
+    private String alias;
     private boolean enabled = true;
     private String description;
+    private String redirectUrl;
     private Map<String, List<String>> attributes;
     private Set<OrganizationDomainRepresentation> domains;
-    private List<UserRepresentation> members;
+    private List<MemberRepresentation> members;
     private List<IdentityProviderRepresentation> identityProviders;
 
     public String getId() {
@@ -52,6 +54,14 @@ public class OrganizationRepresentation {
         return name;
     }
 
+    public String getAlias() {
+        return alias;
+    }
+
+    public void setAlias(String alias) {
+        this.alias = alias;
+    }
+
     public boolean isEnabled() {
         return this.enabled;
     }
@@ -66,6 +76,14 @@ public class OrganizationRepresentation {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getRedirectUrl() {
+        return redirectUrl;
+    }
+
+    public void setRedirectUrl(String redirectUrl) {
+        this.redirectUrl = redirectUrl;
     }
 
     public Map<String, List<String>> getAttributes() {
@@ -110,19 +128,19 @@ public class OrganizationRepresentation {
         getDomains().remove(domain);
     }
 
-    public List<UserRepresentation> getMembers() {
+    public List<MemberRepresentation> getMembers() {
         return members;
     }
 
-    public void setMembers(List<UserRepresentation> members) {
+    public void setMembers(List<MemberRepresentation> members) {
         this.members = members;
     }
 
-    public void addMember(UserRepresentation user) {
+    public void addMember(MemberRepresentation member) {
         if (members == null) {
             members = new ArrayList<>();
         }
-        members.add(user);
+        members.add(member);
     }
 
     public List<IdentityProviderRepresentation> getIdentityProviders() {

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.keycloak.common.util.Base64Url;
+import org.keycloak.common.util.MultivaluedMap;
 import org.keycloak.crypto.AsymmetricSignatureSignerContext;
 import org.keycloak.crypto.ECDSASignatureSignerContext;
 import org.keycloak.crypto.KeyType;
@@ -33,6 +34,7 @@ import org.keycloak.jose.jwk.ECPublicJWK;
 import org.keycloak.jose.jwk.JWK;
 import org.keycloak.jose.jwk.RSAPublicJWK;
 import org.keycloak.jose.jws.JWSHeader;
+import org.keycloak.models.utils.MapperTypeSerializer;
 import org.keycloak.protocol.oidc.grants.ciba.clientpolicy.executor.SecureCibaAuthenticationRequestSigningAlgorithmExecutor;
 import org.keycloak.representations.dpop.DPoP;
 import org.keycloak.representations.idm.ClientPoliciesRepresentation;
@@ -45,6 +47,7 @@ import org.keycloak.representations.idm.ClientProfileRepresentation;
 import org.keycloak.representations.idm.ClientProfilesRepresentation;
 import org.keycloak.services.clientpolicy.ClientPolicyEvent;
 import org.keycloak.services.clientpolicy.condition.ClientAccessTypeCondition;
+import org.keycloak.services.clientpolicy.condition.ClientAttributesCondition;
 import org.keycloak.services.clientpolicy.condition.ClientRolesCondition;
 import org.keycloak.services.clientpolicy.condition.ClientScopesCondition;
 import org.keycloak.services.clientpolicy.condition.ClientUpdaterContextCondition;
@@ -82,6 +85,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static org.junit.Assert.fail;
@@ -401,6 +405,13 @@ public final class ClientPoliciesUtil {
         ClientScopesCondition.Configuration config = new ClientScopesCondition.Configuration();
         config.setType(type);
         config.setScopes(scopes);
+        return config;
+    }
+
+    public static ClientAttributesCondition.Configuration createClientAttributesConditionConfig(MultivaluedMap<String, String> attributes) {
+        ClientAttributesCondition.Configuration config = new ClientAttributesCondition.Configuration();
+        String attrsAsString = MapperTypeSerializer.serialize(attributes);
+        config.setAttributes(attrsAsString);
         return config;
     }
 

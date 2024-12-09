@@ -5,7 +5,7 @@
     <parent>
         <artifactId>integration-arquillian</artifactId>
         <groupId>org.keycloak.testsuite</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -15,12 +15,6 @@
     <name>Test apps</name>
 
     <modules>
-        <module>test-apps-dist</module>
-        <module>hello-world-authz-service</module>
-        <module>servlet-authz</module>
-        <module>servlet-policy-enforcer</module>
         <module>servlets</module>
-        <module>servlets-jakarta</module>
-        <module>cors</module>
     </modules>
 </project>

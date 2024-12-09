@@ -24,7 +24,7 @@
     <parent>
         <artifactId>keycloak-quarkus-test-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -52,6 +52,10 @@
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-quarkus-dist</artifactId>
             <type>zip</type>
+        </dependency>
+        <dependency>
+            <groupId>org.infinispan</groupId>
+            <artifactId>infinispan-server-testdriver-core</artifactId>
         </dependency>
 
         <dependency>

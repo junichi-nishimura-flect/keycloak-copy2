@@ -3,6 +3,7 @@ import {
   type KeycloakContext,
 } from "@keycloak/keycloak-ui-shared";
 
+import OrganizationRepresentation from "@keycloak/keycloak-admin-client/lib/defs/organizationRepresentation";
 import { joinPath } from "../utils/joinPath";
 import { parseResponse } from "./parse-response";
 import {
@@ -108,8 +109,22 @@ export async function getCredentials({ signal, context }: CallOptions) {
   return parseResponse<CredentialContainer[]>(response);
 }
 
-export async function getLinkedAccounts({ signal, context }: CallOptions) {
-  const response = await request("/linked-accounts", context, { signal });
+export type LinkedAccountQueryParams = PaginationParams & {
+  search?: string;
+  linked?: boolean;
+};
+
+export async function getLinkedAccounts(
+  { signal, context }: CallOptions,
+  query: LinkedAccountQueryParams,
+) {
+  const response = await request("/linked-accounts", context, {
+    searchParams: Object.entries(query).reduce(
+      (acc, [key, value]) => ({ ...acc, [key]: value.toString() }),
+      {},
+    ),
+    signal,
+  });
   return parseResponse<LinkedAccountRepresentation[]>(response);
 }
 
@@ -155,4 +170,9 @@ export async function getGroups({ signal, context }: CallOptions) {
     signal,
   });
   return parseResponse<Group[]>(response);
+}
+
+export async function getUserOrganizations({ signal, context }: CallOptions) {
+  const response = await request("/organizations", context, { signal });
+  return parseResponse<OrganizationRepresentation[]>(response);
 }

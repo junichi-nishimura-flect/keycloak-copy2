@@ -100,7 +100,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -172,7 +171,7 @@ public class AuthenticationManager {
     // Parameter of LogoutEndpoint
     public static final String INITIATING_IDP_PARAM = "initiating_idp";
 
-    private static final TokenTypeCheck VALIDATE_IDENTITY_COOKIE = new TokenTypeCheck(Arrays.asList(TokenUtil.TOKEN_TYPE_KEYCLOAK_ID));
+    private static final TokenTypeCheck VALIDATE_IDENTITY_COOKIE = new TokenTypeCheck(List.of(TokenUtil.TOKEN_TYPE_KEYCLOAK_ID));
 
     public static boolean isSessionValid(RealmModel realm, UserSessionModel userSession) {
         if (userSession == null) {
@@ -185,7 +184,8 @@ public class AuthenticationManager {
         long idle = SessionExpirationUtils.calculateUserSessionIdleTimestamp(userSession.isOffline(),
                 userSession.isRememberMe(), TimeUnit.SECONDS.toMillis(userSession.getLastSessionRefresh()), realm);
 
-        boolean sessionIdleOk = idle > currentTime - TimeUnit.SECONDS.toMillis(SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS);
+        boolean sessionIdleOk = idle > currentTime -
+                                       ((Profile.isFeatureEnabled(Profile.Feature.PERSISTENT_USER_SESSIONS) || Profile.isFeatureEnabled(Profile.Feature.CLUSTERLESS)) ? 0 : TimeUnit.SECONDS.toMillis(SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS));
         boolean sessionMaxOk = lifespan == -1L || lifespan > currentTime;
         return sessionIdleOk && sessionMaxOk;
     }
@@ -203,7 +203,8 @@ public class AuthenticationManager {
         long idle = SessionExpirationUtils.calculateClientSessionIdleTimestamp(userSession.isOffline(),
                 userSession.isRememberMe(), TimeUnit.SECONDS.toMillis(clientSession.getTimestamp()), realm, client);
 
-        boolean sessionIdleOk = idle > currentTime - TimeUnit.SECONDS.toMillis(SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS);
+        boolean sessionIdleOk = idle > currentTime -
+                                       ((Profile.isFeatureEnabled(Profile.Feature.PERSISTENT_USER_SESSIONS) || Profile.isFeatureEnabled(Profile.Feature.CLUSTERLESS)) ? 0 : TimeUnit.SECONDS.toMillis(SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS));
         boolean sessionMaxOk = lifespan == -1L || lifespan > currentTime;
         return sessionIdleOk && sessionMaxOk;
     }
@@ -307,8 +308,7 @@ public class AuthenticationManager {
                     checkUserSessionOnlyHasLoggedOutClients(realm, userSession, logoutAuthSession);
         } finally {
             logger.tracef("Removing logout session '%s' after backchannel logout", logoutAuthSession.getParentSession().getId());
-            RootAuthenticationSessionModel rootAuthSession = logoutAuthSession.getParentSession();
-            rootAuthSession.removeAuthenticationSessionByTabId(logoutAuthSession.getTabId());
+            session.authenticationSessions().removeRootAuthenticationSession(realm, logoutAuthSession.getParentSession());
         }
 
         userSession.setState(UserSessionModel.State.LOGGED_OUT);
@@ -417,7 +417,7 @@ public class AuthenticationManager {
         if (logoutBroker) {
             String brokerId = userSession.getNote(Details.IDENTITY_PROVIDER);
             if (brokerId != null) {
-                IdentityProvider identityProvider = IdentityBrokerService.getIdentityProvider(session, realm, brokerId);
+                IdentityProvider identityProvider = IdentityBrokerService.getIdentityProvider(session, brokerId);
                 try {
                     identityProvider.backchannelLogout(session, userSession, uriInfo, realm);
                 } catch (Exception e) {
@@ -648,7 +648,7 @@ public class AuthenticationManager {
         String brokerId = userSession.getNote(Details.IDENTITY_PROVIDER);
         String initiatingIdp = logoutAuthSession.getAuthNote(AuthenticationManager.LOGOUT_INITIATING_IDP);
         if (brokerId != null && !brokerId.equals(initiatingIdp)) {
-            IdentityProvider identityProvider = IdentityBrokerService.getIdentityProvider(session, realm, brokerId);
+            IdentityProvider identityProvider = IdentityBrokerService.getIdentityProvider(session, brokerId);
             Response response = identityProvider.keycloakInitiatedBrowserLogout(session, userSession, uriInfo, realm);
             if (response != null) {
                 return response;
@@ -1210,14 +1210,14 @@ public class AuthenticationManager {
     }
 
 
-    public static void setClientScopesInSession(AuthenticationSessionModel authSession) {
+    public static void setClientScopesInSession(KeycloakSession session, AuthenticationSessionModel authSession) {
         ClientModel client = authSession.getClient();
         UserModel user = authSession.getAuthenticatedUser();
 
         // todo scope param protocol independent
         String scopeParam = authSession.getClientNote(OAuth2Constants.SCOPE);
 
-        Set<String> requestedClientScopes = TokenManager.getRequestedClientScopes(scopeParam, client)
+        Set<String> requestedClientScopes = TokenManager.getRequestedClientScopes(session, scopeParam, client, user)
                 .map(ClientScopeModel::getId).collect(Collectors.toSet());
 
         authSession.setClientScopes(requestedClientScopes);
@@ -1613,7 +1613,7 @@ public class AuthenticationManager {
             UserModel user = lookupUserForBruteForceLog(session, realm, authSession);
             if (user != null) {
                 BruteForceProtector bruteForceProtector = session.getProvider(BruteForceProtector.class);
-                bruteForceProtector.successfulLogin(realm, user, session.getContext().getConnection());
+                bruteForceProtector.successfulLogin(realm, user, session.getContext().getConnection(), session.getContext().getHttpRequest().getUri());
             }
         }
     }

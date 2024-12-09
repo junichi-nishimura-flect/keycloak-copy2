@@ -21,7 +21,7 @@
     <parent>
         <artifactId>keycloak-crypto-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>25.0.2</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,12 +29,6 @@
     <artifactId>keycloak-crypto-fips1402</artifactId>
     <name>Keycloak Crypto FIPS 140-2 Integration</name>
     <description/>
-
-    <properties>
-        <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-    </properties>
 
     <dependencies>
         <dependency>

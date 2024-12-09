@@ -18,12 +18,13 @@
 package org.keycloak.services.resteasy;
 
 import org.keycloak.common.Profile;
+import org.keycloak.common.util.MultiSiteUtils;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.services.error.KcUnrecognizedPropertyExceptionHandler;
 import org.keycloak.services.error.KeycloakErrorHandler;
 import org.keycloak.services.error.KeycloakMismatchedInputExceptionHandler;
 import org.keycloak.services.filters.KeycloakSecurityHeadersFilter;
-import org.keycloak.services.resources.JsResource;
 import org.keycloak.services.resources.KeycloakApplication;
 import org.keycloak.services.resources.LoadBalancerResource;
 import org.keycloak.services.resources.RealmsResource;
@@ -48,11 +49,6 @@ public class ResteasyKeycloakApplication extends KeycloakApplication {
             classes.add(AdminRoot.class);
         }
         classes.add(ThemeResource.class);
-
-        if (Profile.isFeatureEnabled(Profile.Feature.JS_ADAPTER)) {
-            classes.add(JsResource.class);
-        }
-
         classes.add(KeycloakSecurityHeadersFilter.class);
         classes.add(KeycloakErrorHandler.class);
         classes.add(KcUnrecognizedPropertyExceptionHandler.class);
@@ -61,7 +57,7 @@ public class ResteasyKeycloakApplication extends KeycloakApplication {
         singletons.add(new ObjectMapperResolver());
         classes.add(WelcomeResource.class);
 
-        if (Profile.isFeatureEnabled(Profile.Feature.MULTI_SITE)) {
+        if (MultiSiteUtils.isMultiSiteEnabled()) {
             // If we are running in multi-site mode, we need to add a resource which to expose
             // an endpoint for the load balancer to gather information whether this site should receive requests or not.
             classes.add(LoadBalancerResource.class);
@@ -83,6 +79,11 @@ public class ResteasyKeycloakApplication extends KeycloakApplication {
         ResteasyKeycloakSessionFactory factory = new ResteasyKeycloakSessionFactory();
         factory.init();
         return factory;
+    }
+
+    @Override
+    protected void createTemporaryAdmin(KeycloakSession session) {
+        // do nothing
     }
 
 }

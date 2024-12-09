@@ -114,20 +114,13 @@ public class UserStorageManager extends AbstractStorageManager<UserStorageProvid
      */
     protected UserModel importValidation(RealmModel realm, UserModel user) {
 
-        if (Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION) && user != null) {
-            // check if provider is enabled and user is managed member of a disabled organization OR provider is disabled and user is managed member
-            OrganizationProvider organizationProvider = session.getProvider(OrganizationProvider.class);
-            OrganizationModel organization = organizationProvider.getByMember(user);
-
-            if ((organizationProvider.isEnabled() && organization != null && organization.isManaged(user) && !organization.isEnabled()) || 
-                    (!organizationProvider.isEnabled() && organization != null && organization.isManaged(user))) {
-                return new ReadOnlyUserModelDelegate(user) {
-                    @Override
-                    public boolean isEnabled() {
-                        return false;
-                    }
-                };
-            }
+        if (isReadOnlyOrganizationMember(user)) {
+            return new ReadOnlyUserModelDelegate(user) {
+                @Override
+                public boolean isEnabled() {
+                    return false;
+                }
+            };
         }
 
         if (user == null || user.getFederationLink() == null) return user;
@@ -291,13 +284,13 @@ public class UserStorageManager extends AbstractStorageManager<UserStorageProvid
                     }
 
                     logger.tracef("This provider (%s) cannot provide enough users to pass firstResult so we are going to filter it out and change "
-                            + "firstResult for next provider: %d - %d = %d", provider.getClass().getSimpleName(), 
+                            + "firstResult for next provider: %d - %d = %d", provider.getClass().getSimpleName(),
                             currentFirst.get(), expectedNumberOfUsersForProvider, currentFirst.get() - expectedNumberOfUsersForProvider);
                     currentFirst.set((int) (currentFirst.get() - expectedNumberOfUsersForProvider));
                     return false;
                 })
-                // collecting stream of providers to ensure the filtering (above) is evaluated before we move forward to actual querying    
-                .collect(Collectors.toList()).stream(); 
+                // collecting stream of providers to ensure the filtering (above) is evaluated before we move forward to actual querying
+                .collect(Collectors.toList()).stream();
         }
 
         if (needsAdditionalFirstResultFiltering.get() && currentFirst.get() > 0) {
@@ -362,6 +355,8 @@ public class UserStorageManager extends AbstractStorageManager<UserStorageProvid
         if (getFederatedStorage() != null && user.getServiceAccountClientLink() == null) {
             getFederatedStorage().preRemove(realm, user);
         }
+
+        publishUserPreRemovedEvent(realm, user);
 
         StorageId storageId = new StorageId(user.getId());
 
@@ -432,15 +427,22 @@ public class UserStorageManager extends AbstractStorageManager<UserStorageProvid
     @Override
     public Stream<UserModel> getGroupMembersStream(final RealmModel realm, final GroupModel group, Integer firstResult, Integer maxResults) {
         Stream<UserModel> results = query((provider, firstResultInQuery, maxResultsInQuery) -> {
-            if (provider instanceof UserQueryMethodsProvider) {
-                return ((UserQueryMethodsProvider)provider).getGroupMembersStream(realm, group, firstResultInQuery, maxResultsInQuery);
+                    if (provider instanceof UserQueryMethodsProvider) {
+                        return ((UserQueryMethodsProvider) provider).getGroupMembersStream(realm, group, firstResultInQuery, maxResultsInQuery);
 
-            } else if (provider instanceof UserFederatedStorageProvider) {
-                return ((UserFederatedStorageProvider)provider).getMembershipStream(realm, group, firstResultInQuery, maxResultsInQuery).
-                        map(id -> getUserById(realm, id));
-           }
-            return Stream.empty();
-        }, realm, firstResult, maxResults);
+                    } else if (provider instanceof UserFederatedStorageProvider) {
+                        return ((UserFederatedStorageProvider) provider).getMembershipStream(realm, group, firstResultInQuery, maxResultsInQuery).
+                                map(id -> getUserById(realm, id));
+                    }
+                    return Stream.empty();
+                },
+                (provider, firstResultInQuery, maxResultsInQuery) -> {
+                    if (provider instanceof UserCountMethodsProvider) {
+                        return ((UserCountMethodsProvider) provider).getUsersCount(realm, Set.of(group.getId()));
+                    }
+                    return 0;
+                },
+                realm, firstResult, maxResults);
 
         return importValidation(realm, results);
     }
@@ -925,5 +927,45 @@ public class UserStorageManager extends AbstractStorageManager<UserStorageProvid
         }
 
         return Collections.emptyList();
+    }
+
+    private boolean isReadOnlyOrganizationMember(UserModel delegate) {
+        if (delegate == null) {
+            return false;
+        }
+
+        if (!Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION)) {
+            return false;
+        }
+
+        OrganizationProvider organizationProvider = session.getProvider(OrganizationProvider.class);
+
+        if (organizationProvider.count() == 0) {
+            return false;
+        }
+
+        // check if provider is enabled and user is managed member of a disabled organization OR provider is disabled and user is managed member
+        return organizationProvider.getByMember(delegate)
+                .anyMatch((org) -> (organizationProvider.isEnabled() && org.isManaged(delegate) && !org.isEnabled()) ||
+                        (!organizationProvider.isEnabled() && org.isManaged(delegate)));
+    }
+
+    private void publishUserPreRemovedEvent(RealmModel realm, UserModel user) {
+        session.getKeycloakSessionFactory().publish(new UserModel.UserPreRemovedEvent() {
+            @Override
+            public RealmModel getRealm() {
+                return realm;
+            }
+
+            @Override
+            public UserModel getUser() {
+                return user;
+            }
+
+            @Override
+            public KeycloakSession getKeycloakSession() {
+                return session;
+            }
+        });
     }
 }

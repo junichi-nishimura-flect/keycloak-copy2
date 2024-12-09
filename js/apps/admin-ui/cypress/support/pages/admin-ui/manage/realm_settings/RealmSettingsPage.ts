@@ -11,8 +11,8 @@ enum RealmSettingsTab {
 
 const expect = chai.expect;
 export default class RealmSettingsPage extends CommonPage {
-  generalSaveBtn = "general-tab-save";
-  generalRevertBtn = "general-tab-revert";
+  generalSaveBtn = "realmSettingsGeneralTab-save";
+  generalRevertBtn = "realmSettingsGeneralTab-revert";
   themesSaveBtn = "themes-tab-save";
   sessionsSaveBtn = "sessions-tab-save";
   loginTab = "rs-login-tab";
@@ -207,7 +207,7 @@ export default class RealmSettingsPage extends CommonPage {
   #availablePeriodExecutorFld = "available-period";
   #editExecutorBtn =
     '[aria-label="Executors"] > li > div:first-child [data-testid="editExecutor"]';
-  #executorAvailablePeriodInput = "#available-period";
+  #executorAvailablePeriodInput = "[data-testid='available-period']";
 
   #listingPage = new ListingPage();
   #addCondition = "addCondition";

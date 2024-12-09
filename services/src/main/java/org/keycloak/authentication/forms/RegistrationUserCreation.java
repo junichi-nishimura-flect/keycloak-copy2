@@ -317,7 +317,7 @@ public class RegistrationUserCreation implements FormAction, FormActionFactory {
             }
 
             // make sure the organization is set to the session so that UP org-related validators can run
-            session.setAttribute(OrganizationModel.class.getName(), organization);
+            session.getContext().setOrganization(organization);
             session.setAttribute(InviteOrgActionToken.class.getName(), token);
 
             if (token.isExpired() || !token.getActionId().equals(InviteOrgActionToken.TOKEN_TYPE)) {
@@ -342,7 +342,7 @@ public class RegistrationUserCreation implements FormAction, FormActionFactory {
                 KeycloakSession session = context.getSession();
                 OrganizationProvider provider = session.getProvider(OrganizationProvider.class);
                 OrganizationModel orgModel = provider.getById(token.getOrgId());
-                provider.addMember(orgModel, user);
+                provider.addManagedMember(orgModel, user);
                 context.getEvent().detail(Details.ORG_ID, orgModel.getId());
                 context.getAuthenticationSession().setRedirectUri(token.getRedirectUri());
             }
