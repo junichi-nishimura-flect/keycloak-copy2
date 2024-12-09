@@ -182,15 +182,18 @@ public class JpaUtils {
      */
     public static Properties loadSpecificNamedQueries(String databaseType) {
         URL specificUrl = JpaUtils.class.getClassLoader().getResource("META-INF/queries-" + databaseType + ".properties");
+        URL defaultUrl = JpaUtils.class.getClassLoader().getResource("META-INF/queries-default.properties");
 
-        Properties specificQueries = loadSqlProperties(specificUrl);
-        Properties queries = new Properties();
-        if (specificQueries == null) {
-            return queries;
+        if (defaultUrl == null) {
+            throw new IllegalStateException("META-INF/queries-default.properties was not found in the classpath");
         }
 
-        for (String queryNameFull : specificQueries.stringPropertyNames()) {
-            String querySql = specificQueries.getProperty(queryNameFull);
+        Properties specificQueries = loadSqlProperties(specificUrl);
+        Properties defaultQueries = loadSqlProperties(defaultUrl);
+        Properties queries = new Properties();
+
+        for (String queryNameFull : defaultQueries.stringPropertyNames()) {
+            String querySql = defaultQueries.getProperty(queryNameFull);
             String queryName = getQueryShortName(queryNameFull);
             String specificQueryNameFull = getQueryFromProperties(queryName, specificQueries);
 
