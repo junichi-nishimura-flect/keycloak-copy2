@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import {
   NumberControl,
   SelectControl,
-  TextAreaControl,
   TextControl,
 } from "@keycloak/keycloak-ui-shared";
 import { DefaultSwitchControl } from "../../components/SwitchControl";
@@ -285,10 +284,9 @@ const Fields = ({ readOnly }: DescriptorSettingsProps) => {
               isDisabled={readOnly}
             />
             {useMetadataDescriptorUrl !== "true" && (
-              <TextAreaControl
+              <TextControl
                 name="config.signingCertificate"
                 label={t("validatingX509Certs")}
-                labelIcon={t("validatingX509CertsHelp")}
                 readOnly={readOnly}
               />
             )}
