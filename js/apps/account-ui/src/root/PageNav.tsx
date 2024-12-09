@@ -17,6 +17,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  To,
   matchPath,
   useHref,
   useLinkClickHandler,
@@ -91,7 +92,7 @@ function NavMenuItem({ menuItem }: NavMenuItemProps) {
 
   if ("path" in menuItem) {
     return (
-      <NavLink path={menuItem.path} isActive={isActive}>
+      <NavLink to={menuItem.path} isActive={isActive}>
         {t(menuItem.label)}
       </NavLink>
     );
@@ -115,35 +116,31 @@ function NavMenuItem({ menuItem }: NavMenuItemProps) {
   );
 }
 
-function getFullUrl(path: string) {
-  return `${new URL(environment.baseUrl).pathname}${path}`;
-}
-
 function matchMenuItem(currentPath: string, menuItem: MenuItem): boolean {
   if ("path" in menuItem) {
-    return !!matchPath(getFullUrl(menuItem.path), currentPath);
+    return !!matchPath(menuItem.path, currentPath);
   }
 
   return menuItem.children.some((child) => matchMenuItem(currentPath, child));
 }
 
 type NavLinkProps = {
-  path: string;
+  to: To;
   isActive: boolean;
 };
 
 export const NavLink = ({
-  path,
+  to,
   isActive,
   children,
 }: PropsWithChildren<NavLinkProps>) => {
-  const menuItemPath = getFullUrl(path);
+  const menuItemPath = `${new URL(environment.baseUrl).pathname}${to}`;
   const href = useHref(menuItemPath);
   const handleClick = useLinkClickHandler(menuItemPath);
 
   return (
     <NavItem
-      data-testid={path}
+      data-testid={to}
       to={href}
       isActive={isActive}
       onClick={(event) =>
