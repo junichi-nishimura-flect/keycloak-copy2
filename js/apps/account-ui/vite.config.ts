@@ -16,7 +16,6 @@ export default defineConfig(({ mode }) => {
   }
   const lib = env.LIB
     ? {
-        copyPublicDir: false,
         outDir: "lib",
         lib: {
           entry: path.resolve(__dirname, "src/index.ts"),

@@ -55,10 +55,3 @@ export {
   savePersonalInfo,
   unLinkAccount,
 } from "./api/methods";
-export type { Environment as AccountEnvironment } from "./environment";
-export {
-  KeycloakProvider,
-  useEnvironment,
-  useAlerts,
-} from "@keycloak/keycloak-ui-shared";
-export { usePromise } from "./utils/usePromise";
