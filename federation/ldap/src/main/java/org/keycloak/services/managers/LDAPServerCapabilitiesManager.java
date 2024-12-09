@@ -74,7 +74,7 @@ public class LDAPServerCapabilitiesManager {
             if (component != null) {
                 LDAPConfig ldapConfig = new LDAPConfig(component.getConfig());
                 if (Objects.equals(URI.create(config.getConnectionUrl()), URI.create(ldapConfig.getConnectionUrl()))
-                        && config.getBindDn() != null && config.getBindDn().equalsIgnoreCase(ldapConfig.getBindDN())) {
+                        && Objects.equals(LDAPDn.fromString(config.getBindDn()), LDAPDn.fromString(ldapConfig.getBindDN()))) {
                     bindCredential = ldapConfig.getBindCredential();
                 }
             }
