@@ -9,6 +9,7 @@ import org.keycloak.authentication.requiredactions.DeleteAccount;
 import org.keycloak.common.Profile;
 import org.keycloak.common.Version;
 import org.keycloak.common.util.Environment;
+import org.keycloak.common.util.SecureContextResolver;
 import org.keycloak.models.AccountRoles;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.Constants;
@@ -96,15 +97,9 @@ public class AccountConsole implements AccountResourceProvider {
     @NoCache
     @Path("{any:.*}")
     public Response getMainPage() throws IOException, FreeMarkerException {
-        // Get the URI info of the server and admin console.
         final var serverUriInfo = session.getContext().getUri(UrlType.FRONTEND);
-        final var adminUriInfo = session.getContext().getUri(UrlType.ADMIN);
-
-        // Get the base URLs of the server and admin console.
         final var serverBaseUri = serverUriInfo.getBaseUri();
-        final var adminBaseUri = adminUriInfo.getBaseUri();
-
-        // Strip any trailing slashes from the URLs.
+        // Strip any trailing slashes from the URL.
         final var serverBaseUrl = serverBaseUri.toString().replaceFirst("/+$", "");
 
         final var map = new HashMap<String, Object>();
@@ -115,6 +110,9 @@ public class AccountConsole implements AccountResourceProvider {
                 .path("/")
                 .build(realm);
 
+        final var isSecureContext = SecureContextResolver.isSecureContext(serverBaseUri);
+
+        map.put("isSecureContext", isSecureContext);
         map.put("serverBaseUrl", serverBaseUrl);
         // TODO: Some variables are deprecated and only exist to provide backwards compatibility for older themes, they should be removed in a future version.
         // Note that these should be removed from the template of the Account Console as well.
@@ -124,7 +122,7 @@ public class AccountConsole implements AccountResourceProvider {
         map.put("realm", realm);
         map.put("clientId", Constants.ACCOUNT_CONSOLE_CLIENT_ID);
         map.put("resourceUrl", Urls.themeRoot(serverBaseUri).getPath() + "/" + Constants.ACCOUNT_MANAGEMENT_CLIENT_ID + "/" + theme.getName());
-        map.put("resourceCommonUrl", Urls.themeRoot(adminBaseUri).getPath() + "/common/keycloak");
+        map.put("resourceCommonUrl", Urls.themeRoot(serverBaseUri).getPath() + "/common/keycloak");
         map.put("resourceVersion", Version.RESOURCES_VERSION);
 
         String[] referrer = getReferrer();
@@ -166,6 +164,7 @@ public class AccountConsole implements AccountResourceProvider {
         map.put("deleteAccountAllowed", deleteAccountAllowed);
 
         map.put("isViewGroupsEnabled", isViewGroupsEnabled);
+        map.put("isViewOrganizationsEnabled", Profile.isFeatureEnabled(Profile.Feature.ORGANIZATION));
         map.put("isOid4VciEnabled", Profile.isFeatureEnabled(Profile.Feature.OID4VC_VCI));
 
         map.put("updateEmailFeatureEnabled", Profile.isFeatureEnabled(Profile.Feature.UPDATE_EMAIL));

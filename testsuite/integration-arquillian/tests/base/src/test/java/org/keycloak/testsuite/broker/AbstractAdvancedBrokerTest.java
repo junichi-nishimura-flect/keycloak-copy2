@@ -1,10 +1,13 @@
 package org.keycloak.testsuite.broker;
 
+import org.junit.Rule;
 import org.junit.Test;
 import org.keycloak.admin.client.resource.IdentityProviderResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.common.util.Time;
+import org.keycloak.events.Details;
+import org.keycloak.events.EventType;
 import org.keycloak.models.IdentityProviderMapperSyncMode;
 import org.keycloak.models.IdentityProviderSyncMode;
 import org.keycloak.models.utils.TimeBasedOTP;
@@ -18,6 +21,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.services.Urls;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.testsuite.Assert;
+import org.keycloak.testsuite.AssertEvents;
 import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.federation.DummyUserFederationProviderFactory;
 import org.keycloak.testsuite.util.AccountHelper;
@@ -25,6 +29,7 @@ import org.keycloak.testsuite.util.ClientBuilder;
 import org.keycloak.testsuite.util.OAuthClient;
 import org.keycloak.testsuite.util.RealmBuilder;
 import org.keycloak.testsuite.util.TestAppHelper;
+import org.keycloak.testsuite.util.WaitUtils;
 import org.openqa.selenium.TimeoutException;
 
 import jakarta.ws.rs.client.Client;
@@ -70,6 +75,8 @@ import static org.keycloak.testsuite.broker.BrokerTestTools.waitForPage;
  */
 public abstract class AbstractAdvancedBrokerTest extends AbstractBrokerTest {
 
+    @Rule
+    public AssertEvents events = new AssertEvents(this);
 
     protected void createRoleMappersForConsumerRealm() {
         createRoleMappersForConsumerRealm(IdentityProviderMapperSyncMode.FORCE);
@@ -546,7 +553,8 @@ public abstract class AbstractAdvancedBrokerTest extends AbstractBrokerTest {
             totpPage.assertCurrent();
             String totpSecret = totpPage.getTotpSecret();
             totpPage.configure(totp.generateTOTP(totpSecret));
-            assertNumFederatedIdentities(realm.users().search(bc.getUserLogin()).get(0).getId(), 1);
+            final UserRepresentation user = realm.users().search(bc.getUserLogin()).get(0);
+            assertNumFederatedIdentities(user.getId(), 1);
             AccountHelper.logout(adminClient.realm(bc.consumerRealmName()), bc.getUserLogin());
             AccountHelper.logout(adminClient.realm(bc.providerRealmName()), bc.getUserLogin());
 
@@ -559,20 +567,30 @@ public abstract class AbstractAdvancedBrokerTest extends AbstractBrokerTest {
 
             loginTotpPage.assertCurrent();
 
+            events.clear();
+
             // Login for 2 times with incorrect TOTP. This should temporarily disable the user
             loginTotpPage.login("bad-totp");
             Assert.assertEquals("Invalid authenticator code.", loginTotpPage.getInputError());
-
+            WaitUtils.waitForPageToLoad();
             loginTotpPage.login("bad-totp");
             Assert.assertEquals("Invalid authenticator code.", loginTotpPage.getInputError());
+            WaitUtils.waitForPageToLoad();
+
+            // wait for the disabled to come
+            events.expect(EventType.USER_DISABLED_BY_TEMPORARY_LOCKOUT)
+                    .realm(consumerRealmRep.getId())
+                    .user(user.getId())
+                    .client((String) null)
+                    .detail(Details.REASON, "brute_force_attack detected")
+                    .assertEvent(true, 5);
 
             // Login with valid TOTP. I should not be able to login
             loginTotpPage.login(totp.generateTOTP(totpSecret));
             Assert.assertEquals("Invalid authenticator code.", loginTotpPage.getInputError());
 
             // Clear login failures
-            String userId = ApiUtil.findUserByUsername(realm, bc.getUserLogin()).getId();
-            realm.attackDetection().clearBruteForceForUser(userId);
+            realm.attackDetection().clearBruteForceForUser(user.getId());
 
             setOtpTimeOffset(TimeBasedOTP.DEFAULT_INTERVAL_SECONDS, totp);
 

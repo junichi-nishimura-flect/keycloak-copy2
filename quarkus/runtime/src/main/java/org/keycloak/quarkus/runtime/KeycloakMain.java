@@ -20,10 +20,10 @@ package org.keycloak.quarkus.runtime;
 import static org.keycloak.quarkus.runtime.Environment.getKeycloakModeFromProfile;
 import static org.keycloak.quarkus.runtime.Environment.isDevProfile;
 import static org.keycloak.quarkus.runtime.Environment.getProfileOrDefault;
-import static org.keycloak.quarkus.runtime.Environment.isImportExportMode;
+import static org.keycloak.quarkus.runtime.Environment.isNonServerMode;
 import static org.keycloak.quarkus.runtime.Environment.isTestLaunchMode;
-import static org.keycloak.quarkus.runtime.cli.Picocli.parseAndRun;
 import static org.keycloak.quarkus.runtime.cli.command.AbstractStartCommand.OPTIMIZED_BUILD_OPTION_LONG;
+import static org.keycloak.quarkus.runtime.cli.command.AbstractStartCommand.wasBuildEverRun;
 import static org.keycloak.quarkus.runtime.cli.command.Start.isDevProfileNotAllowed;
 
 import java.io.PrintWriter;
@@ -74,10 +74,17 @@ public class KeycloakMain implements QuarkusApplication {
             cliArgs.add("-h");
         } else if (isFastStart(cliArgs)) { // fast path for starting the server without bootstrapping CLI
 
+            if (!wasBuildEverRun()) {
+                handleUsageError(Messages.optimizedUsedForFirstStartup());
+                return;
+            }
+
             if (isDevProfileNotAllowed()) {
                 handleUsageError(Messages.devProfileNotAllowedError(Start.NAME));
                 return;
             }
+
+            Environment.setParsedCommand(new Start());
 
             try {
                 PropertyMappers.sanitizeDisabledMappers();
@@ -96,7 +103,7 @@ public class KeycloakMain implements QuarkusApplication {
         }
 
         // parse arguments and execute any of the configured commands
-        parseAndRun(cliArgs);
+        new Picocli().parseAndRun(cliArgs);
     }
 
     /**
@@ -168,7 +175,7 @@ public class KeycloakMain implements QuarkusApplication {
 
         int exitCode = ApplicationLifecycleManager.getExitCode();
 
-        if (isTestLaunchMode() || isImportExportMode()) {
+        if (isTestLaunchMode() || isNonServerMode()) {
             // in test mode we exit immediately
             // we should be managing this behavior more dynamically depending on the tests requirements (short/long lived)
             Quarkus.asyncExit(exitCode);

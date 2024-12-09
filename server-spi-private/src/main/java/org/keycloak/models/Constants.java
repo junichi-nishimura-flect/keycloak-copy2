@@ -43,8 +43,6 @@ public final class Constants {
     public static final Collection<String> defaultClients = Arrays.asList(ACCOUNT_MANAGEMENT_CLIENT_ID, ADMIN_CLI_CLIENT_ID, BROKER_SERVICE_CLIENT_ID, REALM_MANAGEMENT_CLIENT_ID, ADMIN_CONSOLE_CLIENT_ID);
 
     public static final String INSTALLED_APP_URN = "urn:ietf:wg:oauth:2.0:oob";
-    public static final String INSTALLED_APP_URL = "http://localhost";
-    public static final String INSTALLED_APP_LOOPBACK = "http://127.0.0.1";
 
     public static final String READ_TOKEN_ROLE = "read-token";
     public static final String[] BROKER_SERVICE_ROLES = {READ_TOKEN_ROLE};
@@ -68,7 +66,7 @@ public final class Constants {
     public static final int DEFAULT_SESSION_IDLE_TIMEOUT = 1800; // 30 minutes
     public static final int DEFAULT_SESSION_MAX_LIFESPAN = 36000; // 10 hours
 
-    public static final String DEFAULT_WEBAUTHN_POLICY_SIGNATURE_ALGORITHMS = Algorithm.ES256;
+    public static final String DEFAULT_WEBAUTHN_POLICY_SIGNATURE_ALGORITHMS = Algorithm.ES256+","+Algorithm.RS256;
     public static final String DEFAULT_WEBAUTHN_POLICY_RP_ENTITY_NAME = "keycloak";
     // it stands for optional parameter not specified in WebAuthn
     public static final String DEFAULT_WEBAUTHN_POLICY_NOT_SPECIFIED = "not specified";
@@ -181,4 +179,10 @@ public final class Constants {
 
     // attribute name used in apps to mark that it is an admin console and its azp is allowed
     public static final String SECURITY_ADMIN_CONSOLE_ATTR = "security.admin.console";
+
+    //attribute name used to mark a client as realm client
+    public static final String REALM_CLIENT = "realm_client";
+
+    //attribute name used to mark a temporary admin user/service account as temporary
+    public static final String IS_TEMP_ADMIN_ATTR_NAME = "is_temporary_admin";
 }

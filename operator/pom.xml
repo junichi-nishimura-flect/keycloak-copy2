@@ -7,19 +7,15 @@
     <parent>
         <artifactId>keycloak-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>999.0.0-SNAPSHOT</version>
+        <version>26.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    
+
     <name>Keycloak Operator</name>
     <artifactId>keycloak-operator</artifactId>
 
     <properties>
-        <compiler-plugin.version>3.8.1</compiler-plugin.version>
         <maven.compiler.parameters>true</maven.compiler.parameters>
-        <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.container-image.group>keycloak</quarkus.container-image.group>
@@ -40,10 +36,17 @@
 
 
     <dependencies>
+        <!-- Sundrio -->
+        <dependency>
+            <groupId>io.sundr</groupId>
+            <artifactId>builder-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Fabric8 -->
         <dependency>
             <groupId>io.fabric8</groupId>
-            <artifactId>crd-generator-apt</artifactId>
+            <artifactId>generator-annotations</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -155,10 +158,6 @@
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.build.version}</version>
             </plugin>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>${compiler-plugin.version}</version>
-            </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -173,7 +172,7 @@
                     </goals>
                     <configuration>
                         <properties>
-                            <quarkus.package.filter-optional-dependencies>true</quarkus.package.filter-optional-dependencies> 
+                            <quarkus.package.jar.filter-optional-dependencies>true</quarkus.package.jar.filter-optional-dependencies>
                         </properties>
                     </configuration>
                     </execution>
@@ -296,8 +295,8 @@
             </plugin>
         </plugins>
     </build>
-    
-    
+
+
     <profiles>
         <profile>
             <id>operator-prod</id>

@@ -1,6 +1,10 @@
 import IdentityProviderRepresentation from "@keycloak/keycloak-admin-client/lib/defs/identityProviderRepresentation";
 import { IdentityProvidersQuery } from "@keycloak/keycloak-admin-client/lib/resources/identityProviders";
-import { FormErrorText, HelpItem } from "@keycloak/keycloak-ui-shared";
+import {
+  FormErrorText,
+  HelpItem,
+  useFetch,
+} from "@keycloak/keycloak-ui-shared";
 import {
   Button,
   Chip,
@@ -21,8 +25,7 @@ import { Controller, useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useAdminClient } from "../admin-client";
 import { ComponentProps } from "../components/dynamic/components";
-import { KeycloakSpinner } from "../components/keycloak-spinner/KeycloakSpinner";
-import { useFetch } from "../utils/useFetch";
+import { KeycloakSpinner } from "@keycloak/keycloak-ui-shared";
 import useToggle from "../utils/useToggle";
 
 type IdentityProviderSelectProps = ComponentProps & {
@@ -63,13 +66,13 @@ export const IdentityProviderSelect = ({
     async () => {
       const params: IdentityProvidersQuery = {
         max: 20,
+        realmOnly: true,
       };
       if (search) {
         params.search = search;
       }
 
-      const idps = await adminClient.identityProviders.find(params);
-      return idps.filter((i) => !i.config?.["kc.org"]);
+      return await adminClient.identityProviders.find(params);
     },
     setIdps,
     [search],
@@ -81,7 +84,7 @@ export const IdentityProviderSelect = ({
     const options = identityProviders.map((option) => (
       <SelectOption
         key={option!.alias}
-        value={option!.alias}
+        value={option}
         selected={values?.includes(option!.alias!)}
       >
         {option!.alias}
@@ -120,6 +123,7 @@ export const IdentityProviderSelect = ({
         render={({ field }) => (
           <Select
             id={name!}
+            onOpenChange={toggleOpen}
             toggle={(ref) => (
               <MenuToggle
                 data-testid={name!}
@@ -195,10 +199,17 @@ export const IdentityProviderSelect = ({
             isOpen={open}
             selected={field.value}
             onSelect={(_, v) => {
-              const option = v?.toString();
+              const idp = v as IdentityProviderRepresentation;
+              const option = idp.alias!;
               if (variant !== "typeaheadMulti") {
                 const removed = field.value.includes(option);
-                removed ? field.onChange([]) : field.onChange([option]);
+
+                if (removed) {
+                  field.onChange([]);
+                } else {
+                  field.onChange([option]);
+                }
+
                 setInputValue(removed ? "" : option || "");
                 setOpen(false);
               } else {

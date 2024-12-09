@@ -58,7 +58,7 @@ public class OptionsDistTest {
     @Launch({"start", "--log=console", "--log-file-output=json", "--http-enabled=true", "--hostname-strict=false"})
     public void testServerDoesNotStartIfDisabledFileLogOption(LaunchResult result) {
         assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Disabled option: '--log-file-output'. Available only when File log handler is activated")).count());
-        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-console-output, --log-console-format, --log-console-color")).count());
+        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-console-output, --log-console-level, --log-console-format, --log-console-color, --log-level")).count());
     }
 
     @Test
@@ -70,14 +70,13 @@ public class OptionsDistTest {
 
     @Test
     @Order(5)
-    @WithEnvVars({"KC_LOG", "console", "KC_LOG_CONSOLE_COLOR", "true", "KC_LOG_FILE", "something-env", "KC_LOG_GELF_VERSION", "1.1", "KC_HTTP_ENABLED", "true", "KC_HOSTNAME_STRICT", "false"})
+    @WithEnvVars({"KC_LOG", "console", "KC_LOG_CONSOLE_COLOR", "true", "KC_LOG_FILE", "something-env", "KC_HTTP_ENABLED", "true", "KC_HOSTNAME_STRICT", "false"})
     @Launch({"start"})
     public void testSettingEnvVars(LaunchResult result) {
         CLIResult cliResult = (CLIResult) result;
 
         cliResult.assertMessage("The following used run time options are UNAVAILABLE and will be ignored during build time:");
         cliResult.assertMessage("- log-file: Available only when File log handler is activated.");
-        cliResult.assertMessage("- log-gelf-version: Available only when GELF is activated.");
         cliResult.assertMessage("quarkus.log.console.color");
         cliResult.assertMessage("config property is deprecated and should not be used anymore");
     }
@@ -87,50 +86,39 @@ public class OptionsDistTest {
     @RawDistOnly(reason = "Raw is enough and we avoid issues with including custom conf file in the container")
     public void testExpressionsInConfigFile(KeycloakDistribution distribution) {
         distribution.setEnvVar("MY_LOG_LEVEL", "warn");
-        CLIResult result = distribution.run(CONFIG_FILE_LONG_NAME + "=" + Paths.get("src/test/resources/OptionsDistTest/keycloak.conf").toAbsolutePath().normalize(), "start", "--http-enabled=true", "--hostname-strict=false", "--optimized");
+        CLIResult result = distribution.run(CONFIG_FILE_LONG_NAME + "=" + Paths.get("src/test/resources/OptionsDistTest/keycloak.conf").toAbsolutePath().normalize(), "start", "--http-enabled=true", "--hostname-strict=false");
         result.assertNoMessage("INFO [io.quarkus]");
         result.assertNoMessage("Listening on:");
 
         // specified in the OptionsDistTest/keycloak.conf
         result.assertMessage("The following used run time options are UNAVAILABLE and will be ignored during build time:");
-        result.assertMessage("- log-gelf-level: Available only when GELF is activated.");
-        result.assertMessage("- log-gelf-version: Available only when GELF is activated.");
-    }
-
-    @Test
-    @Order(7)
-    @Launch({"start-dev", "--log=console", "--log-gelf-include-stack-trace=true"})
-    public void testDisabledGelfOption(LaunchResult result) {
-        CLIResult cliResult = (CLIResult) result;
-        cliResult.assertError("Disabled option: '--log-gelf-include-stack-trace'. Available only when GELF is activated");
-        cliResult.assertError("Possible solutions: --log, --log-console-output, --log-console-format, --log-console-color, --log-level");
-        cliResult.assertError("Try '" + KeycloakDistribution.SCRIPT_CMD + " start-dev --help' for more information on the available options.");
-        cliResult.assertError("Specify '--help-all' to obtain information on all options and their availability.");
+        result.assertMessage("- log-syslog-protocol: Available only when Syslog is activated.");
+        result.assertMessage("- log-syslog-app-name: Available only when Syslog is activated.");
     }
 
     // Start-dev should be executed as last tests - build is done for development mode
 
     @Test
-    @Order(8)
+    @Order(7)
     @Launch({"start-dev", "--test=invalid"})
     public void testServerDoesNotStartIfValidationFailDuringReAugStartDev(LaunchResult result) {
         assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Unknown option: '--test'")).count());
     }
 
     @Test
-    @Order(9)
+    @Order(8)
     @Launch({"start-dev", "--log=console", "--log-file-output=json"})
     public void testServerDoesNotStartDevIfDisabledFileLogOption(LaunchResult result) {
         assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Disabled option: '--log-file-output'. Available only when File log handler is activated")).count());
-        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-console-output, --log-console-format, --log-console-color")).count());
+        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-console-output, --log-console-level, --log-console-format, --log-console-color, --log-level")).count());
     }
 
     @Test
-    @Order(10)
+    @Order(9)
     @Launch({"start-dev", "--log=file", "--log-file-output=json", "--log-console-color=true"})
     public void testServerStartDevIfEnabledFileLogOption(LaunchResult result) {
         assertEquals(0, result.getErrorStream().stream().filter(s -> s.contains("Disabled option: '--log-file-output'. Available only when File log handler is activated")).count());
         assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Disabled option: '--log-console-color'. Available only when Console log handler is activated")).count());
-        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-file, --log-file-format, --log-file-output, --log-level")).count());
+        assertEquals(1, result.getErrorStream().stream().filter(s -> s.contains("Possible solutions: --log, --log-file, --log-file-level, --log-file-format, --log-file-output, --log-level")).count());
     }
 }

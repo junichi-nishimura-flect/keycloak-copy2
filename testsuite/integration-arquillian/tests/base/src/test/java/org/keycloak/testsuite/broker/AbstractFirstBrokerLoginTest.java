@@ -20,7 +20,6 @@ import org.keycloak.events.Details;
 import org.keycloak.events.EventType;
 import org.keycloak.models.IdentityProviderMapperModel;
 import org.keycloak.models.IdentityProviderSyncMode;
-import org.keycloak.models.UserModel;
 import org.keycloak.representations.idm.ComponentRepresentation;
 import org.keycloak.representations.idm.EventRepresentation;
 import org.keycloak.representations.idm.FederatedIdentityRepresentation;
@@ -33,7 +32,6 @@ import org.keycloak.testsuite.Assert;
 import org.keycloak.testsuite.AssertEvents;
 import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.federation.UserMapStorageFactory;
-import org.keycloak.testsuite.forms.VerifyProfileTest;
 import org.keycloak.testsuite.pages.LoginPasswordUpdatePage;
 import org.keycloak.testsuite.util.AccountHelper;
 import org.keycloak.testsuite.util.FederatedIdentityBuilder;
@@ -45,11 +43,11 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import org.openqa.selenium.support.PageFactory;
 
 import static org.junit.Assert.assertEquals;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertTrue;
 import static org.keycloak.storage.UserStorageProviderModel.IMPORT_ENABLED;
 import static org.keycloak.testsuite.admin.ApiUtil.removeUserByUsername;
@@ -72,7 +70,7 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
     @Drone
     @SecondBrowser
     protected WebDriver driver2;
-    
+
     @Rule
     public AssertEvents events = new AssertEvents(this);
 
@@ -893,9 +891,6 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
 
         List<UserRepresentation> users = realm.users().search("no-email");
         assertEquals(1, users.size());
-        List<String> requiredActions = users.get(0).getRequiredActions();
-        assertEquals(1, requiredActions.size());
-        assertEquals(UserModel.RequiredAction.VERIFY_EMAIL.name(), requiredActions.get(0));
 
     }
 
@@ -1025,6 +1020,53 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
     }
 
     @Test
+    public void testLinkAccountByEmailVerificationInAnotherBrowser() {
+        RealmResource realm = adminClient.realm(bc.consumerRealmName());
+
+        UserResource userResource = realm.users().get(createUser("consumer"));
+        UserRepresentation consumerUser = userResource.toRepresentation();
+
+        consumerUser.setEmail(bc.getUserEmail());
+        consumerUser.setEmailVerified(true);
+        userResource.update(consumerUser);
+        configureSMTPServer();
+
+        oauth.clientId("broker-app");
+        loginPage.open(bc.consumerRealmName());
+
+        logInWithBroker(bc);
+
+        //link account by email
+        waitForPage(driver, "update account information", false);
+        Assert.assertTrue(updateAccountInformationPage.isCurrent());
+        updateAccountInformationPage.updateAccountInformation("FirstName", "LastName");
+        waitForPage(driver, "account already exists", false);
+        assertTrue(idpConfirmLinkPage.isCurrent());
+        assertEquals("User with email user@localhost.com already exists. How do you want to continue?", idpConfirmLinkPage.getMessage());
+        idpConfirmLinkPage.clickLinkAccount();
+        idpLinkEmailPage.assertCurrent();
+
+        String url = assertEmailAndGetUrl(MailServerConfiguration.FROM, USER_EMAIL,
+                "Someone wants to link your ", false);
+
+        // in the second browser confirm the mail
+        driver2.navigate().to(url);
+        assertThat(driver2.findElement(By.className("instruction")).getText(), startsWith("Confirm linking the account"));
+        driver2.findElement(By.linkText("» Click here to proceed")).click();
+        assertThat(driver2.findElement(By.className("instruction")).getText(), startsWith("You successfully verified your email."));
+
+        idpLinkEmailPage.continueLink();
+
+        //test if user is logged in
+        assertTrue(driver.getCurrentUrl().startsWith(getConsumerRoot() + "/auth/realms/master/app/"));
+        // check user is linked
+        List<FederatedIdentityRepresentation> identities = userResource.getFederatedIdentity();
+        assertEquals(1, identities.size());
+        assertEquals(bc.getIDPAlias(), identities.iterator().next().getIdentityProvider());
+        assertEquals(bc.getUserLogin(), identities.iterator().next().getUserName());
+    }
+
+    @Test
     public void testLinkAccountByEmailVerificationToEmailVerifiedUser() {
         // set up a user with verified email
         RealmResource realm = adminClient.realm(bc.consumerRealmName());
@@ -1146,7 +1188,7 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
         //test if the user has verified email
         assertTrue(consumerRealm.users().get(linkedUserId).toRepresentation().isEmailVerified());
     }
-    
+
     @Test
     public void testEventsOnUpdateProfileNoEmailChange() {
         updateExecutions(AbstractBrokerTest::setUpMissingUpdateProfileOnFirstLogin);
@@ -1165,7 +1207,7 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
         loginPage.login("no-first-name", "password");
 
         waitForPage(driver, "update account information", false);
-        
+
         updateAccountInformationPage.assertCurrent();
         updateAccountInformationPage.updateAccountInformation("FirstName", "LastName");
 
@@ -1219,7 +1261,7 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
         loginPage.login("no-first-name", "password");
 
         waitForPage(driver, "update account information", false);
-        
+
         updateAccountInformationPage.assertCurrent();
         updateAccountInformationPage.updateAccountInformation("new-email@localhost.com","FirstName", "LastName");
 
@@ -1294,7 +1336,7 @@ public abstract class AbstractFirstBrokerLoginTest extends AbstractInitializedBa
         loginPage.login("no-first-name", "password");
 
         waitForPage(driver, "update account information", false);
-        
+
         updateAccountInformationPage.assertCurrent();
         updateAccountInformationPage.updateAccountInformation("FirstName", "LastName");
 

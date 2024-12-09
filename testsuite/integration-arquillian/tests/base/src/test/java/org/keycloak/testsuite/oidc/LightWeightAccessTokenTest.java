@@ -19,14 +19,20 @@ package org.keycloak.testsuite.oidc;
 
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.HttpHeaders;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.jboss.logging.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.resource.ClientScopeResource;
 import org.keycloak.admin.client.resource.ProtocolMappersResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.common.Profile;
+import org.keycloak.models.AdminRoles;
 import org.keycloak.models.Constants;
 import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.utils.ModelToRepresentation;
@@ -63,6 +69,7 @@ import org.keycloak.utils.MediaType;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -483,6 +490,71 @@ public class LightWeightAccessTokenTest extends AbstractClientPoliciesTest {
         } finally {
             addDefaultBasicClientScope();
             alwaysUseLightWeightAccessToken(false);
+        }
+    }
+
+    @Test
+    public void testAdminConsoleClientWithLightweightAccessToken() {
+
+        oauth.realm("master");
+        oauth.clientId(Constants.ADMIN_CONSOLE_CLIENT_ID);
+        oauth.redirectUri(OAuthClient.SERVER_ROOT + "/auth/admin/master/console");
+        PkceGenerator pkce = new PkceGenerator();
+        oauth.codeChallenge(pkce.getCodeChallenge());
+        oauth.codeChallengeMethod(OAuth2Constants.PKCE_METHOD_S256);
+        oauth.codeVerifier(pkce.getCodeVerifier());
+
+        OAuthClient.AuthorizationEndpointResponse authsEndpointResponse = oauth.doLogin("admin", "admin");
+        OAuthClient.AccessTokenResponse tokenResponse = oauth.doAccessTokenRequest(authsEndpointResponse.getCode(), TEST_CLIENT_SECRET);
+        String accessToken = tokenResponse.getAccessToken();
+        logger.debug("access token:" + accessToken);
+        assertBasicClaims(oauth.verifyToken(accessToken), true, true);
+
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+            HttpGet get = new HttpGet(OAuthClient.SERVER_ROOT + "/auth/admin/realms/master");
+            get.setHeader("Authorization", "Bearer " + accessToken);
+            try (CloseableHttpResponse response = client.execute(get)) {
+                Assert.assertEquals(200, response.getStatusLine().getStatusCode());
+                RealmRepresentation realmRepresentation = JsonSerialization.readValue(response.getEntity().getContent(), RealmRepresentation.class);
+                Assert.assertEquals("master", realmRepresentation.getRealm());
+            }
+        } catch (Exception e) {
+            Assert.fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void testAdminApiWithLightweightAccessTokenAndTransientSession() {
+        RealmResource masterRealm = realmsResouce().realm("master");
+        ClientRepresentation transientClient = KeycloakModelUtils.createClient(realmsResouce().realm("master").toRepresentation(), "transient_client");
+        transientClient.setServiceAccountsEnabled(Boolean.TRUE);
+        transientClient.setAttributes(new HashMap<>());
+        transientClient.getAttributes().put(Constants.USE_LIGHTWEIGHT_ACCESS_TOKEN_ENABLED, String.valueOf(true));
+        masterRealm.clients().create(transientClient);
+        transientClient = masterRealm.clients().findByClientId(transientClient.getClientId()).get(0);
+
+        UserRepresentation userRep = masterRealm.clients().get(transientClient.getId()).getServiceAccountUser();
+        masterRealm.users().get(userRep.getId()).roles().realmLevel().add(Collections.singletonList(masterRealm.roles().get(AdminRoles.ADMIN).toRepresentation()));
+        try {
+            oauth.realm("master");
+            oauth.clientId(transientClient.getClientId());
+            OAuthClient.AccessTokenResponse tokenResponse = oauth.doClientCredentialsGrantAccessTokenRequest(transientClient.getSecret());
+            String accessTokenString = tokenResponse.getAccessToken();
+            Assert.assertNull(tokenResponse.getRefreshToken());
+            AccessToken accessToken = oauth.verifyToken(accessTokenString);
+            Assert.assertNotNull(accessToken.getSubject());
+            Assert.assertNull(accessToken.getSessionId());
+
+            CloseableHttpClient client = HttpClientBuilder.create().build();
+            HttpGet get = new HttpGet(OAuthClient.SERVER_ROOT + "/auth/admin/realms/master");
+            get.setHeader("Authorization", "Bearer " + accessTokenString);
+            CloseableHttpResponse response = client.execute(get);
+            Assert.assertEquals(200, response.getStatusLine().getStatusCode());
+            RealmRepresentation realmRepresentation = JsonSerialization.readValue(response.getEntity().getContent(), RealmRepresentation.class);
+            Assert.assertEquals("master", realmRepresentation.getRealm());
+
+        } catch (Exception e) {
+            Assert.fail(e.getMessage());
         }
     }
 

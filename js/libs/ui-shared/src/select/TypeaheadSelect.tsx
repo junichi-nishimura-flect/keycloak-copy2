@@ -37,6 +37,7 @@ export const TypeaheadSelect = ({
   chipGroupComponent,
   chipGroupProps,
   footer,
+  isDisabled,
   children,
   ...rest
 }: KeycloakSelectProps) => {
@@ -113,7 +114,7 @@ export const TypeaheadSelect = ({
     <Select
       {...rest}
       onClick={toggle}
-      onOpenChange={() => onToggle?.(false)}
+      onOpenChange={(isOpen) => onToggle?.(isOpen)}
       onSelect={(_, value) => onSelect?.(value || "")}
       maxMenuHeight={propertyToString(maxHeight)}
       popperProps={{ direction, width: propertyToString(width) }}
@@ -124,6 +125,7 @@ export const TypeaheadSelect = ({
           variant="typeahead"
           onClick={() => onToggle?.(true)}
           icon={toggleIcon}
+          isDisabled={isDisabled}
           isExpanded={rest.isOpen}
           isFullWidth
           status={validated === "error" ? MenuToggleStatus.danger : undefined}

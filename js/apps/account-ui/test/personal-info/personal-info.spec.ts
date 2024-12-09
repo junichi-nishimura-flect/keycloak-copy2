@@ -14,10 +14,12 @@ import { randomUUID } from "crypto";
 const realm = "user-profile";
 
 test.describe("Personal info page", () => {
-  let user: string;
-  test("sets basic information", async ({ page }) => {
-    user = await createRandomUserWithPassword("user-" + randomUUID(), "pwd");
+  const user = "user-" + randomUUID();
 
+  test.beforeAll(() => createRandomUserWithPassword(user, "pwd"));
+  test.afterAll(async () => await inRealm(realm, () => deleteUser(user)));
+
+  test("sets basic information", async ({ page }) => {
     await login(page, user, "pwd");
 
     await page.getByTestId("email").fill(`${user}@somewhere.com`);
@@ -25,7 +27,7 @@ test.describe("Personal info page", () => {
     await page.getByTestId("lastName").fill("de Wit");
     await page.getByTestId("save").click();
 
-    const alerts = page.getByTestId("alerts");
+    const alerts = page.getByTestId("last-alert");
     await expect(alerts).toHaveText("Your account has been updated.");
   });
 });
@@ -95,7 +97,7 @@ test.describe("Personal info with userprofile enabled", () => {
     await page.getByRole("option", { name: "two" }).click();
     await page.getByTestId("email2").fill("non-valid");
     await page.getByTestId("save").click();
-    await expect(page.getByTestId("alerts")).toHaveText(
+    await expect(page.getByTestId("last-alert")).toHaveText(
       "Could not update account due to validation errors",
     );
 
@@ -113,8 +115,7 @@ test.describe("Personal info with userprofile enabled", () => {
   });
 });
 
-// skip currently the locale is not part of the response
-test.describe.skip("Realm localization", () => {
+test.describe("Realm localization", () => {
   test.beforeAll(() => enableLocalization());
 
   test("change locale", async ({ page }) => {
@@ -124,15 +125,14 @@ test.describe.skip("Realm localization", () => {
     );
 
     await login(page, user, "pwd");
-    await page
-      .locator("div")
-      .filter({ hasText: /^Deutsch$/ })
-      .nth(2)
-      .click();
+    await page.locator("#locale").click();
+    page.getByRole("option").filter({ hasText: "Deutsch" });
     await page.getByRole("option", { name: "English" }).click();
     await page.getByTestId("save").click();
     await page.reload();
 
-    expect(page.locator("div").filter({ hasText: /^English$/ })).toBeDefined();
+    expect(
+      page.locator("#locale").filter({ hasText: /^English$/ }),
+    ).toBeDefined();
   });
 });

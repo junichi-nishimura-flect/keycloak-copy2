@@ -20,6 +20,7 @@ package org.keycloak.quarkus.runtime.configuration;
 import static org.keycloak.quarkus.runtime.Environment.getProfileOrDefault;
 import static org.keycloak.quarkus.runtime.cli.Picocli.ARG_PREFIX;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -29,9 +30,9 @@ import io.smallrye.config.SmallRyeConfig;
 import org.eclipse.microprofile.config.spi.ConfigProviderResolver;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import org.keycloak.config.Option;
-import org.keycloak.quarkus.runtime.Environment;
 import org.keycloak.quarkus.runtime.configuration.mappers.PropertyMapper;
 import org.keycloak.quarkus.runtime.configuration.mappers.PropertyMappers;
+import org.keycloak.utils.StringUtil;
 
 import static org.keycloak.quarkus.runtime.configuration.MicroProfileConfigProvider.NS_KEYCLOAK_PREFIX;
 
@@ -54,6 +55,12 @@ public final class Configuration {
 
     public static boolean isTrue(String propertyName) {
         return getOptionalBooleanValue(propertyName).orElse(false);
+    }
+
+    public static boolean isBlank(Option<?> option) {
+        return getOptionalKcValue(option.getKey())
+                .map(StringUtil::isBlank)
+                .orElse(true);
     }
 
     public static boolean contains(Option<?> option, String value) {
@@ -104,6 +111,10 @@ public final class Configuration {
         return Optional.ofNullable(PersistedConfigSource.getInstance().getValue(name));
     }
 
+    public static Map<String, String> getRawPersistedProperties() {
+        return PersistedConfigSource.getInstance().getProperties();
+    }
+
     public static String getRawValue(String propertyName) {
         return getConfig().getRawValue(propertyName);
     }
@@ -134,6 +145,10 @@ public final class Configuration {
 
     public static Optional<String> getOptionalKcValue(String propertyName) {
         return getOptionalValue(NS_KEYCLOAK_PREFIX.concat(propertyName));
+    }
+
+    public static Optional<String> getOptionalKcValue(Option<?> option) {
+        return getOptionalKcValue(option.getKey());
     }
 
     public static Optional<Boolean> getOptionalBooleanKcValue(String propertyName) {

@@ -21,12 +21,14 @@ import static java.util.Optional.ofNullable;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
+import org.keycloak.OAuth2Constants;
 import org.keycloak.TokenVerifier;
 import org.keycloak.authentication.actiontoken.inviteorg.InviteOrgActionToken;
 import org.keycloak.common.Profile;
@@ -36,50 +38,53 @@ import org.keycloak.http.HttpRequest;
 import org.keycloak.models.Constants;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.GroupModel;
+import org.keycloak.models.GroupModel.Type;
 import org.keycloak.models.IdentityProviderModel;
 import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.OrganizationDomainModel;
 import org.keycloak.models.OrganizationModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.organization.OrganizationProvider;
-import org.keycloak.representations.idm.OrganizationDomainRepresentation;
-import org.keycloak.representations.idm.OrganizationRepresentation;
+import org.keycloak.organization.protocol.mappers.oidc.OrganizationScope;
 import org.keycloak.services.ErrorResponse;
-import org.keycloak.utils.StringUtil;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
 public class Organizations {
 
     public static boolean canManageOrganizationGroup(KeycloakSession session, GroupModel group) {
+        if (!Type.ORGANIZATION.equals(group.getType())) {
+            return true;
+        }
+
         if (Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
-            Object organization = session.getAttribute(OrganizationModel.class.getName());
+            OrganizationModel organization = resolveOrganization(session);
 
-            if (organization != null) {
-                return true;
-            }
-
-            String orgId = group.getFirstAttribute(OrganizationModel.ORGANIZATION_ATTRIBUTE);
-
-            return StringUtil.isBlank(orgId);
+            return organization != null && organization.getId().equals(group.getName());
         }
 
         return true;
     }
 
-    public static List<IdentityProviderModel> resolveBroker(KeycloakSession session, UserModel user) {
-        OrganizationProvider provider = session.getProvider(OrganizationProvider.class);
+    public static List<IdentityProviderModel> resolveHomeBroker(KeycloakSession session, UserModel user) {
+        OrganizationProvider provider = getProvider(session);
         RealmModel realm = session.getContext().getRealm();
-        OrganizationModel organization = provider.getByMember(user);
+        List<OrganizationModel> organizations = Optional.ofNullable(user).stream().flatMap(provider::getByMember)
+                .filter(OrganizationModel::isEnabled)
+                .filter((org) -> org.isManaged(user))
+                .toList();
 
-        if (organization == null || !organization.isEnabled()) {
+        if (organizations.isEmpty()) {
             return List.of();
         }
 
-        if (provider.isManagedMember(organization, user)) {
+        List<IdentityProviderModel> brokers = new ArrayList<>();
+
+        for (OrganizationModel organization : organizations) {
+            // user is a managed member, try to resolve the origin broker and redirect automatically
             List<IdentityProviderModel> organizationBrokers = organization.getIdentityProviders().toList();
-            return session.users().getFederatedIdentitiesStream(realm, user)
+            session.users().getFederatedIdentitiesStream(realm, user)
                     .map(f -> {
-                        IdentityProviderModel broker = realm.getIdentityProviderByAlias(f.getIdentityProvider());
+                        IdentityProviderModel broker = session.identityProviders().getByAlias(f.getIdentityProvider());
 
                         if (!organizationBrokers.contains(broker)) {
                             return null;
@@ -93,36 +98,29 @@ public class Organizations {
 
                         return null;
                     }).filter(Objects::nonNull)
-                    .toList();
+                    .forEach(brokers::add);
         }
 
-        return List.of();
+        return brokers;
     }
 
     public static Consumer<GroupModel> removeGroup(KeycloakSession session, RealmModel realm) {
         return group -> {
-            if (!Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
+            if (!Type.ORGANIZATION.equals(group.getType())) {
                 realm.removeGroup(group);
                 return;
             }
 
-            OrganizationModel current = (OrganizationModel) session.getAttribute(OrganizationModel.class.getName());
+            OrganizationModel current = resolveOrganization(session);
 
             try {
-                String orgId = group.getFirstAttribute(OrganizationModel.ORGANIZATION_ATTRIBUTE);
-                OrganizationProvider provider = session.getProvider(OrganizationProvider.class);
+                OrganizationProvider provider = getProvider(session);
 
-                if (orgId != null) {
-                    session.setAttribute(OrganizationModel.class.getName(), provider.getById(orgId));
-                }
+                session.getContext().setOrganization(provider.getById(group.getName()));
 
                 realm.removeGroup(group);
             } finally {
-                if (current == null) {
-                    session.removeAttribute(OrganizationModel.class.getName());
-                } else {
-                    session.setAttribute(OrganizationModel.class.getName(), current);
-                }
+                session.getContext().setOrganization(current);
             }
         };
     }
@@ -131,57 +129,20 @@ public class Organizations {
         return orgProvider != null && orgProvider.isEnabled() && orgProvider.count() != 0;
     }
 
+    public static boolean isEnabledAndOrganizationsPresent(KeycloakSession session) {
+        if (!Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
+            return false;
+        }
+
+        OrganizationProvider provider = getProvider(session);
+
+        return isEnabledAndOrganizationsPresent(provider);
+    }
+
     public static void checkEnabled(OrganizationProvider provider) {
         if (provider == null || !provider.isEnabled()) {
             throw ErrorResponse.error("Organizations not enabled for this realm.", Response.Status.NOT_FOUND);
         }
-    }
-
-    public static OrganizationRepresentation toRepresentation(OrganizationModel model) {
-        if (model == null) {
-            return null;
-        }
-
-        OrganizationRepresentation rep = new OrganizationRepresentation();
-
-        rep.setId(model.getId());
-        rep.setName(model.getName());
-        rep.setEnabled(model.isEnabled());
-        rep.setDescription(model.getDescription());
-        rep.setAttributes(model.getAttributes());
-        model.getDomains().filter(Objects::nonNull).map(Organizations::toRepresentation)
-                .forEach(rep::addDomain);
-
-        return rep;
-    }
-
-    public static OrganizationDomainRepresentation toRepresentation(OrganizationDomainModel model) {
-        OrganizationDomainRepresentation representation = new OrganizationDomainRepresentation();
-        representation.setName(model.getName());
-        representation.setVerified(model.isVerified());
-        return representation;
-    }
-
-    public static OrganizationModel toModel(OrganizationRepresentation rep, OrganizationModel model) {
-        if (rep == null) {
-            return null;
-        }
-
-        model.setName(rep.getName());
-        model.setEnabled(rep.isEnabled());
-        model.setDescription(rep.getDescription());
-        model.setAttributes(rep.getAttributes());
-        model.setDomains(ofNullable(rep.getDomains()).orElse(Set.of()).stream()
-                    .filter(Objects::nonNull)
-                    .filter(domain -> StringUtil.isNotBlank(domain.getName()))
-                    .map(Organizations::toModel)
-                    .collect(Collectors.toSet()));
-
-        return model;
-    }
-
-    public static OrganizationDomainModel toModel(OrganizationDomainRepresentation domainRepresentation) {
-        return new OrganizationDomainModel(domainRepresentation.getName(), domainRepresentation.isVerified());
     }
 
     public static InviteOrgActionToken parseInvitationToken(HttpRequest request) throws VerificationException {
@@ -193,5 +154,91 @@ public class Organizations {
         }
 
         return TokenVerifier.create(tokenFromQuery, InviteOrgActionToken.class).getToken();
+    }
+
+    public static String getEmailDomain(String email) {
+        if (email == null) {
+            return null;
+        }
+
+        int domainSeparator = email.indexOf('@');
+
+        if (domainSeparator == -1) {
+            return null;
+        }
+
+        return email.substring(domainSeparator + 1);
+    }
+
+    public static OrganizationModel resolveOrganization(KeycloakSession session) {
+        return resolveOrganization(session, null, null);
+    }
+
+    public static OrganizationModel resolveOrganization(KeycloakSession session, UserModel user) {
+        return resolveOrganization(session, user, null);
+    }
+
+    public static OrganizationModel resolveOrganization(KeycloakSession session, UserModel user, String domain) {
+        if (!session.getContext().getRealm().isOrganizationsEnabled()) {
+            return null;
+        }
+
+        Optional<OrganizationModel> organization = Optional.ofNullable(session.getContext().getOrganization());
+
+        if (organization.isPresent()) {
+            // resolved from current keycloak session
+            return organization.get();
+        }
+
+        OrganizationProvider provider = getProvider(session);
+
+        if (provider.count() == 0) {
+            return null;
+        }
+
+        AuthenticationSessionModel authSession = session.getContext().getAuthenticationSession();
+
+        if (authSession != null) {
+            String rawScopes = authSession.getClientNote(OAuth2Constants.SCOPE);
+            OrganizationScope scope = OrganizationScope.valueOfScope(rawScopes);
+
+            List<OrganizationModel> organizations = ofNullable(authSession.getAuthNote(OrganizationModel.ORGANIZATION_ATTRIBUTE))
+                    .map(provider::getById)
+                    .map(List::of)
+                    .orElseGet(() -> scope == null ? List.of() : scope.resolveOrganizations(user, rawScopes, session).toList());
+
+            if (organizations.size() == 1) {
+                // single organization mapped from authentication session
+                return organizations.get(0);
+            } else if (scope != null) {
+                // organization scope requested but no single organization mapped from the scope
+                return null;
+            }
+        }
+
+        organization = ofNullable(user).stream().flatMap(provider::getByMember)
+                .filter(o -> o.isEnabled() && provider.isManagedMember(o, user))
+                .findAny();
+
+        if (organization.isPresent()) {
+            return organization.get();
+        }
+
+        if (user != null && domain == null) {
+            domain = getEmailDomain(user.getEmail());
+        }
+
+        return ofNullable(domain)
+                .map(provider::getByDomainName)
+                .orElse(null);
+    }
+
+    public static OrganizationProvider getProvider(KeycloakSession session) {
+        return session.getProvider(OrganizationProvider.class);
+    }
+
+    public static boolean isRegistrationAllowed(KeycloakSession session, RealmModel realm) {
+        if (session.getContext().getOrganization() != null) return true;
+        return realm.isRegistrationAllowed();
     }
 }

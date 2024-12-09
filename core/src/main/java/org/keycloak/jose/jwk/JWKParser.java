@@ -24,15 +24,15 @@ import org.keycloak.util.JsonSerialization;
  */
 public class JWKParser extends AbstractJWKParser {
 
-    protected JWKParser() {
-    }
-
-    public JWKParser(JWK jwk) {
-        this.jwk = jwk;
+    private JWKParser() {
     }
 
     public static JWKParser create() {
         return new JWKParser();
+    }
+
+    public JWKParser(JWK jwk) {
+        this.jwk = jwk;
     }
 
     public static JWKParser create(JWK jwk) {

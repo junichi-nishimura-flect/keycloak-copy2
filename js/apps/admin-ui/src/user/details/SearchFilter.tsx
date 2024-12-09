@@ -43,8 +43,10 @@ export const SearchDropdown = ({
   return (
     <Dropdown
       className="keycloak__users__searchtype"
+      onOpenChange={(isOpen) => setSearchToggle(isOpen)}
       toggle={(ref) => (
         <MenuToggle
+          data-testid="user-search-toggle"
           ref={ref}
           id="toggle-id"
           onClick={() => setSearchToggle(!searchToggle)}

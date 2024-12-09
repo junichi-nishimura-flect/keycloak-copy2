@@ -1,17 +1,16 @@
 import ComponentRepresentation from "@keycloak/keycloak-admin-client/lib/defs/componentRepresentation";
 import ComponentTypeRepresentation from "@keycloak/keycloak-admin-client/lib/defs/componentTypeRepresentation";
+import { useAlerts, useFetch } from "@keycloak/keycloak-ui-shared";
 import { ActionGroup, Button, Form, PageSection } from "@patternfly/react-core";
 import { useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useAdminClient } from "../admin-client";
-import { useAlerts } from "../components/alert/Alerts";
 import { DynamicComponents } from "../components/dynamic/DynamicComponents";
 import { useRealm } from "../context/realm-context/RealmContext";
-import { useFetch } from "../utils/useFetch";
 import { useParams } from "../utils/useParams";
-import { PAGE_PROVIDER, TAB_PROVIDER } from "./PageList";
+import { type PAGE_PROVIDER, TAB_PROVIDER } from "./PageList";
 import { toPage } from "./routes";
 
 type PageHandlerProps = {
@@ -68,9 +67,10 @@ export const PageHandler = ({
       if (id) {
         await adminClient.components.update({ id }, updatedComponent);
       } else {
-        await adminClient.components.create(updatedComponent);
+        const { id } = await adminClient.components.create(updatedComponent);
+        setId(id);
       }
-      addAlert("itemSaveSuccessful");
+      addAlert(t("itemSaveSuccessful"));
     } catch (error) {
       addError("itemSaveError", error);
     }

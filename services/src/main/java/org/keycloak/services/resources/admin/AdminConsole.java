@@ -33,6 +33,7 @@ import org.keycloak.common.ClientConnection;
 import org.keycloak.common.Profile;
 import org.keycloak.common.Version;
 import org.keycloak.common.util.Environment;
+import org.keycloak.common.util.SecureContextResolver;
 import org.keycloak.common.util.UriUtils;
 import org.keycloak.headers.SecurityHeadersProvider;
 import org.keycloak.http.HttpRequest;
@@ -68,6 +69,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.keycloak.models.Constants.IS_TEMP_ADMIN_ATTR_NAME;
+
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
@@ -98,6 +101,7 @@ public class AdminConsole {
         protected String realm;
         protected String displayName;
         protected Locale locale;
+        protected boolean isTemporary;
 
         @JsonProperty("createRealm")
         protected boolean createRealm;
@@ -107,13 +111,14 @@ public class AdminConsole {
         public WhoAmI() {
         }
 
-        public WhoAmI(String userId, String realm, String displayName, boolean createRealm, Map<String, Set<String>> realmAccess, Locale locale) {
+        public WhoAmI(String userId, String realm, String displayName, boolean createRealm, Map<String, Set<String>> realmAccess, Locale locale, boolean isTemporary) {
             this.userId = userId;
             this.realm = realm;
             this.displayName = displayName;
             this.createRealm = createRealm;
             this.realmAccess = realmAccess;
             this.locale = locale;
+            this.isTemporary = isTemporary;
         }
 
         public String getUserId() {
@@ -167,6 +172,14 @@ public class AdminConsole {
         @JsonProperty(value = "locale")
         public String getLocaleLanguageTag() {
             return locale != null ? locale.toLanguageTag() : null;
+        }
+
+        public boolean isTemporary() {
+            return isTemporary;
+        }
+
+        public void setTemporary(boolean temporary) {
+            isTemporary = temporary;
         }
     }
 
@@ -269,7 +282,7 @@ public class AdminConsole {
                 .allowedOrigins(authResult.getToken())
                 .allowedMethods("GET")
                 .auth()
-                .add(Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale)));
+                .add(Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale, Boolean.parseBoolean(user.getFirstAttribute(IS_TEMP_ADMIN_ATTR_NAME)))));
     }
 
     private void addRealmAccess(RealmModel realm, UserModel user, Map<String, Set<String>> realmAdminAccess) {
@@ -335,7 +348,9 @@ public class AdminConsole {
 
             final var map = new HashMap<String, Object>();
             final var theme = AdminRoot.getTheme(session, realm);
+            final var isSecureContext = SecureContextResolver.isSecureContext(adminBaseUri);
 
+            map.put("isSecureContext", isSecureContext);
             map.put("serverBaseUrl", serverBaseUrl);
             map.put("adminBaseUrl", adminBaseUrl);
             // TODO: Some variables are deprecated and only exist to provide backwards compatibility for older themes, they should be removed in a future version.
@@ -345,7 +360,6 @@ public class AdminConsole {
             map.put("consoleBaseUrl", Urls.adminConsoleRoot(adminBaseUri, realm.getName()).getPath());
             map.put("resourceUrl", Urls.themeRoot(adminBaseUri).getPath() + "/admin/" + theme.getName());
             map.put("resourceCommonUrl", Urls.themeRoot(adminBaseUri).getPath() + "/common/keycloak");
-            map.put("keycloakJsUrl", adminBaseUrl + "/js/keycloak.js?version=" + Version.RESOURCES_VERSION);
             map.put("masterRealm", Config.getAdminRealm());
             map.put("resourceVersion", Version.RESOURCES_VERSION);
             map.put("loginRealm", realm.getName());

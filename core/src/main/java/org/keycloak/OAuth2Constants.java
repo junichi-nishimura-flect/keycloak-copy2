@@ -93,6 +93,7 @@ public interface OAuth2Constants {
     String SCOPE_PHONE = "phone";
 
     String ORGANIZATION = "organization";
+    String ORGANIZATION_ID = "id";
 
     String UI_LOCALES_PARAM = "ui_locales";
 
@@ -152,6 +153,8 @@ public interface OAuth2Constants {
     String ISSUER = "iss";
 
     String AUTHENTICATOR_METHOD_REFERENCE = "amr";
+
+    String CNF = "cnf";
 }
 
 

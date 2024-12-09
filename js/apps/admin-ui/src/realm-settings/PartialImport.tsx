@@ -29,9 +29,9 @@ import {
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAdminClient } from "../admin-client";
-import { useAlerts } from "../components/alert/Alerts";
+import { useAlerts } from "@keycloak/keycloak-ui-shared";
 import { JsonFileUpload } from "../components/json-file-upload/JsonFileUpload";
-import { KeycloakDataTable } from "../components/table-toolbar/KeycloakDataTable";
+import { KeycloakDataTable } from "@keycloak/keycloak-ui-shared";
 import { useRealm } from "../context/realm-context/RealmContext";
 
 export type PartialImportProps = {
@@ -332,8 +332,9 @@ export const PartialImportDialog = (props: PartialImportProps) => {
                     toggleId="realm-selector"
                     isOpen={isRealmSelectOpen}
                     typeAheadAriaLabel={t("realmSelector")}
-                    aria-label={"realmSelector"}
+                    aria-label={t("realmSelector")}
                     onToggle={() => setIsRealmSelectOpen(!isRealmSelectOpen)}
+                    selections={targetRealm.id}
                     onSelect={(value) => handleRealmSelect(value)}
                     placeholderText={targetRealm.realm || targetRealm.id}
                   >
@@ -369,6 +370,7 @@ export const PartialImportDialog = (props: PartialImportProps) => {
                   onToggle={() => {
                     setIsCollisionSelectOpen(!isCollisionSelectOpen);
                   }}
+                  selections={collisionOption}
                   onSelect={handleCollisionSelect}
                   placeholderText={t(collisionOption)}
                 >

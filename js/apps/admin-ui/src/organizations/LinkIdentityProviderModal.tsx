@@ -12,7 +12,7 @@ import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useAdminClient } from "../admin-client";
 import { DefaultSwitchControl } from "../components/SwitchControl";
-import { useAlerts } from "../components/alert/Alerts";
+import { useAlerts } from "@keycloak/keycloak-ui-shared";
 import {
   convertAttributeNameToForm,
   convertFormValuesToObject,
@@ -29,9 +29,9 @@ type LinkIdentityProviderModalProps = {
 
 type LinkRepresentation = {
   alias: string[] | string;
+  hideOnLogin: boolean;
   config: {
     "kc.org.domain": string;
-    "kc.org.broker.public": string;
   };
 };
 
@@ -51,7 +51,11 @@ export const LinkIdentityProviderModal = ({
   useEffect(
     () =>
       convertToFormValues(
-        { ...identityProvider, alias: [identityProvider?.alias] },
+        {
+          ...identityProvider,
+          alias: [identityProvider?.alias],
+          hideOnLogin: identityProvider?.hideOnLogin,
+        },
         setValue,
       ),
     [],
@@ -72,6 +76,7 @@ export const LinkIdentityProviderModal = ({
         ...foundIdentityProvider.config,
         ...config,
       };
+      foundIdentityProvider.hideOnLogin = data.hideOnLogin;
       await adminClient.identityProviders.update(
         { alias: data.alias[0] },
         foundIdentityProvider,
@@ -140,10 +145,10 @@ export const LinkIdentityProviderModal = ({
             menuAppendTo="parent"
           />
           <DefaultSwitchControl
-            name={convertAttributeNameToForm("config.kc.org.broker.public")}
-            label={t("shownOnLoginPage")}
-            labelIcon={t("shownOnLoginPageHelp")}
-            stringify
+            name="hideOnLogin"
+            label={t("hideOnLoginPage")}
+            labelIcon={t("hideOnLoginPageHelp")}
+            defaultValue={true}
           />
           <DefaultSwitchControl
             name={convertAttributeNameToForm(

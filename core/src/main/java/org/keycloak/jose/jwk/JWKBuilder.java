@@ -26,6 +26,9 @@ import java.security.Key;
  */
 public class JWKBuilder extends AbstractJWKBuilder {
 
+    private JWKBuilder() {
+    }
+
     public static JWKBuilder create() {
         return new JWKBuilder();
     }

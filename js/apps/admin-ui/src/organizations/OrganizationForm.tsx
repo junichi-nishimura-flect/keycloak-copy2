@@ -5,10 +5,12 @@ import {
   TextControl,
 } from "@keycloak/keycloak-ui-shared";
 import { FormGroup } from "@patternfly/react-core";
+import { useEffect } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { AttributeForm } from "../components/key-value-form/AttributeForm";
-import { MultiLineInput } from "../components/multi-line-input/MultiLineInput";
 import { keyValueToArray } from "../components/key-value-form/key-value-convert";
+import { MultiLineInput } from "../components/multi-line-input/MultiLineInput";
 
 export type OrganizationFormType = AttributeForm &
   Omit<OrganizationRepresentation, "domains" | "attributes"> & {
@@ -23,14 +25,35 @@ export const convertToOrg = (
   attributes: keyValueToArray(org.attributes),
 });
 
-export const OrganizationForm = () => {
+type OrganizationFormProps = {
+  readOnly?: boolean;
+};
+
+export const OrganizationForm = ({
+  readOnly = false,
+}: OrganizationFormProps) => {
   const { t } = useTranslation();
+  const { setValue } = useFormContext();
+  const name = useWatch({ name: "name" });
+
+  useEffect(() => {
+    if (!readOnly) {
+      setValue("alias", name);
+    }
+  }, [name, readOnly]);
+
   return (
     <>
       <TextControl
         label={t("name")}
         name="name"
         rules={{ required: t("required") }}
+      />
+      <TextControl
+        label={t("alias")}
+        name="alias"
+        labelIcon={t("organizationAliasHelp")}
+        isDisabled={readOnly}
       />
       <FormGroup
         label={t("domain")}
@@ -49,6 +72,11 @@ export const OrganizationForm = () => {
           addButtonLabel="addDomain"
         />
       </FormGroup>
+      <TextControl
+        label={t("redirectUrl")}
+        name="redirectUrl"
+        labelIcon={t("organizationRedirectUrlHelp")}
+      />
       <TextAreaControl name="description" label={t("description")} />
     </>
   );

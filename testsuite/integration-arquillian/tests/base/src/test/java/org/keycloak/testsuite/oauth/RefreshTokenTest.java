@@ -33,6 +33,7 @@ import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RealmsResource;
 import org.keycloak.admin.client.resource.UserResource;
+import org.keycloak.common.Profile;
 import org.keycloak.common.enums.SslRequired;
 import org.keycloak.cookie.CookieType;
 import org.keycloak.crypto.Algorithm;
@@ -63,6 +64,7 @@ import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserSessionRepresentation;
 import org.keycloak.testsuite.AbstractKeycloakTest;
 import org.keycloak.testsuite.AssertEvents;
+import org.keycloak.testsuite.ProfileAssume;
 import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.arquillian.undertow.lb.SimpleUndertowLoadBalancer;
 import org.keycloak.testsuite.oidc.AbstractOIDCScopeTest;
@@ -460,8 +462,9 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
             oauth.fillLoginForm("alice", "alice");
 
             String aliceCode = oauth.getCurrentQuery().get(OAuth2Constants.CODE);
-            WebClient webClient = DroneHtmlUnitDriver.class.cast(driver).getWebClient();
-            webClient.getCookieManager().clearCookies();
+//            WebClient webClient = DroneHtmlUnitDriver.class.cast(driver).getWebClient();
+//            webClient.getCookieManager().clearCookies();
+            driver.manage().deleteAllCookies();
             oauth.openLoginForm();
             driver.manage().addCookie(authSessionCookie);
             oauth.fillLoginForm("bob", "bob");
@@ -1067,8 +1070,8 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
         try {
             // Continue with login
             setTimeOffset(2);
-            WaitUtils.waitForPageToLoad();
-            loginPage.login("password");
+            driver.navigate().refresh();
+            oauth.fillLoginForm("test-user@localhost", "password");
 
             assertFalse(loginPage.isCurrent());
 
@@ -1101,8 +1104,8 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
         try {
             // Continue with login
             setTimeOffset(2);
-            WaitUtils.waitForPageToLoad();
-            loginPage.login("password");
+            driver.navigate().refresh();
+            oauth.fillLoginForm("test-user@localhost", "password");
 
             assertFalse(loginPage.isCurrent());
 
@@ -1134,8 +1137,8 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
 
             // Continue with login
             setTimeOffset(2);
-            WaitUtils.waitForPageToLoad();
-            loginPage.login("password");
+            driver.navigate().refresh();
+            oauth.fillLoginForm("test-user@localhost", "password");
 
             assertFalse(loginPage.isCurrent());
 
@@ -1210,7 +1213,7 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
 
             events.clear();
             // Needs to add some additional time due the tollerance allowed by IDLE_TIMEOUT_WINDOW_SECONDS
-            setTimeOffset(6 + SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS);
+            setTimeOffset(6 + (ProfileAssume.isFeatureEnabled(Profile.Feature.PERSISTENT_USER_SESSIONS) ? 0 : SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS));
             tokenResponse = oauth.doRefreshTokenRequest(tokenResponse.getRefreshToken(), "password");
 
             // test idle timeout
@@ -1252,7 +1255,7 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
             String refreshId = oauth.parseRefreshToken(tokenResponse.getRefreshToken()).getId();
             int last = testingClient.testing().getLastSessionRefresh("test", sessionId, false);
 
-            setTimeOffset(110 + SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS);
+            setTimeOffset(110 + (ProfileAssume.isFeatureEnabled(Profile.Feature.PERSISTENT_USER_SESSIONS) ? 0 : SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS));
             tokenResponse = oauth.doRefreshTokenRequest(tokenResponse.getRefreshToken(), "password");
             oauth.verifyToken(tokenResponse.getAccessToken());
             oauth.parseRefreshToken(tokenResponse.getRefreshToken());
@@ -1263,7 +1266,7 @@ public class RefreshTokenTest extends AbstractKeycloakTest {
 
             events.clear();
             // Needs to add some additional time due the tollerance allowed by IDLE_TIMEOUT_WINDOW_SECONDS
-            setTimeOffset(620 + 2 * SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS);
+            setTimeOffset(620 + 2 * (ProfileAssume.isFeatureEnabled(Profile.Feature.PERSISTENT_USER_SESSIONS) ? 0 : SessionTimeoutHelper.IDLE_TIMEOUT_WINDOW_SECONDS));
             tokenResponse = oauth.doRefreshTokenRequest(tokenResponse.getRefreshToken(), "password");
 
             // test idle remember me timeout

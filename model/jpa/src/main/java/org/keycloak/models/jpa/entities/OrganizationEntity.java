@@ -31,6 +31,7 @@ import jakarta.persistence.NamedQueries;
 import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import org.keycloak.utils.StringUtil;
 
 @Table(name="ORG")
 @Entity
@@ -43,7 +44,9 @@ import jakarta.persistence.Table;
                 " where o.realmId = :realmId AND (o.name = :search OR d.name = :search) order by o.name ASC"),
         @NamedQuery(name="getByNameOrDomainContained", query="select distinct o from OrganizationEntity o inner join OrganizationDomainEntity d ON o.id = d.organization.id" +
                 " where o.realmId = :realmId AND (lower(o.name) like concat('%',:search,'%') OR d.name like concat('%',:search,'%')) order by o.name ASC"),
-        @NamedQuery(name="getCount", query="select count(o) from OrganizationEntity o where o.realmId = :realmId")
+        @NamedQuery(name="getCount", query="select count(o) from OrganizationEntity o where o.realmId = :realmId"),
+        @NamedQuery(name="deleteOrganizationsByRealm", query="delete from OrganizationEntity o where o.realmId = :realmId"),
+        @NamedQuery(name="getGroupsByMember", query="select m.groupId from UserGroupMembershipEntity m join GroupEntity g on g.id = m.groupId where g.type = 1 and m.user.id = :userId")
 })
 public class OrganizationEntity {
 
@@ -55,11 +58,17 @@ public class OrganizationEntity {
     @Column(name = "NAME")
     private String name;
 
+    @Column(name = "ALIAS")
+    private String alias;
+
     @Column(name = "ENABLED")
     private boolean enabled;
 
     @Column(name = "DESCRIPTION")
     private String description;
+
+    @Column(name = "REDIRECT_URL")
+    private String redirectUrl;
 
     @Column(name = "REALM_ID")
     private String realmId;
@@ -82,6 +91,14 @@ public class OrganizationEntity {
         this.name = name;
     }
 
+    public String getAlias() {
+        return alias;
+    }
+
+    public void setAlias(String alias) {
+        this.alias = alias;
+    }
+
     public boolean isEnabled() {
         return this.enabled;
     }
@@ -96,6 +113,17 @@ public class OrganizationEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getRedirectUrl() {
+        return redirectUrl;
+    }
+
+    public void setRedirectUrl(String redirectUrl) {
+        if (StringUtil.isNullOrEmpty(redirectUrl)) {
+            redirectUrl = null;
+        }
+        this.redirectUrl = redirectUrl;
     }
 
     public String getRealmId() {

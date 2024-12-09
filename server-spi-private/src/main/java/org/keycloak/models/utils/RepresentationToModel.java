@@ -78,7 +78,6 @@ import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.IdentityProviderMapperModel;
 import org.keycloak.models.IdentityProviderModel;
-import org.keycloak.models.KeycloakContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelException;
 import org.keycloak.models.OrganizationDomainModel;
@@ -109,6 +108,8 @@ import org.keycloak.representations.idm.FederatedIdentityRepresentation;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.IdentityProviderMapperRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
+import org.keycloak.representations.idm.OrganizationDomainRepresentation;
+import org.keycloak.representations.idm.OrganizationRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -128,6 +129,7 @@ import org.keycloak.storage.DatastoreProvider;
 import org.keycloak.util.JsonSerialization;
 import org.keycloak.utils.StringUtil;
 
+import static java.util.Optional.ofNullable;
 import static org.keycloak.protocol.saml.util.ArtifactBindingUtils.computeArtifactBindingIdentifierString;
 
 public class RepresentationToModel {
@@ -564,7 +566,7 @@ public class RepresentationToModel {
     }
 
     private static String determineNewSecret(ClientModel client, ClientRepresentation rep) {
-        if (Boolean.TRUE.equals(rep.isPublicClient()) || Boolean.TRUE.equals(rep.isBearerOnly())) {
+        if (client.isPublicClient() || client.isBearerOnly()) {
             // Clear out the secret with null
             return null;
         }
@@ -655,8 +657,8 @@ public class RepresentationToModel {
     }
 
     /**
-     * Create Supplier to update property, if not null.
-     * Captures {@link ClientTypeException} if thrown by the setter.
+     * Create Supplier to update property.
+     * Captures and returns {@link ClientTypeException} if thrown by the setter.
      *
      * @param modelSetter setter to call.
      * @param representationGetter getter supplying the property update.
@@ -687,9 +689,7 @@ public class RepresentationToModel {
     private static <T> Supplier<ClientTypeException> updatePropertyAction(Consumer<T> modelSetter, Supplier<T>... getters) {
         Stream<T> firstNonNullSupplied = Stream.of(getters)
                 .map(Supplier::get)
-                .map(Optional::ofNullable)
-                .filter(Optional::isPresent)
-                .map(Optional::get);
+                .filter(Objects::nonNull);
         return updateProperty(modelSetter, () -> firstNonNullSupplied.findFirst().orElse(null));
     }
 
@@ -869,15 +869,20 @@ public class RepresentationToModel {
         identityProviderModel.setProviderId(representation.getProviderId());
         identityProviderModel.setEnabled(representation.isEnabled());
         identityProviderModel.setLinkOnly(representation.isLinkOnly());
+        identityProviderModel.setHideOnLogin(representation.isHideOnLogin());
+        // remove the legacy hide on login attribute if present.
+        String hideOnLoginAttr = representation.getConfig().remove(IdentityProviderModel.LEGACY_HIDE_ON_LOGIN_ATTR);
+        if (hideOnLoginAttr != null) identityProviderModel.setHideOnLogin(Boolean.parseBoolean(hideOnLoginAttr));
         identityProviderModel.setTrustEmail(representation.isTrustEmail());
         identityProviderModel.setAuthenticateByDefault(representation.isAuthenticateByDefault());
         identityProviderModel.setStoreToken(representation.isStoreToken());
         identityProviderModel.setAddReadTokenRoleOnCreate(representation.isAddReadTokenRoleOnCreate());
-        updateOrganizationBroker(realm, representation, session);
+        updateOrganizationBroker(representation, session);
+        identityProviderModel.setOrganizationId(representation.getOrganizationId());
         identityProviderModel.setConfig(removeEmptyString(representation.getConfig()));
 
         String flowAlias = representation.getFirstBrokerLoginFlowAlias();
-        if (flowAlias == null || flowAlias.trim().length() == 0) {
+        if (flowAlias == null || flowAlias.trim().isEmpty()) {
             identityProviderModel.setFirstBrokerLoginFlowId(null);
         } else {
             AuthenticationFlowModel flowModel = realm.getFlowByAlias(flowAlias);
@@ -888,7 +893,7 @@ public class RepresentationToModel {
         }
 
         flowAlias = representation.getPostBrokerLoginFlowAlias();
-        if (flowAlias == null || flowAlias.trim().length() == 0) {
+        if (flowAlias == null || flowAlias.trim().isEmpty()) {
             identityProviderModel.setPostBrokerLoginFlowId(null);
         } else {
             AuthenticationFlowModel flowModel = realm.getFlowByAlias(flowAlias);
@@ -1061,7 +1066,7 @@ public class RepresentationToModel {
             Set<String> keys = new HashSet<>(rep.getConfig().keySet());
             for (String k : keys) {
                 if (!internal && !providerConfiguration.containsKey(k)) {
-                    break;
+                    continue;
                 }
 
                 List<String> values = rep.getConfig().get(k);
@@ -1641,22 +1646,22 @@ public class RepresentationToModel {
         return toModel(representation, authorization, client);
     }
 
-    private static void updateOrganizationBroker(RealmModel realm, IdentityProviderRepresentation representation, KeycloakSession session) {
+    private static void updateOrganizationBroker(IdentityProviderRepresentation representation, KeycloakSession session) {
         if (!Profile.isFeatureEnabled(Feature.ORGANIZATION)) {
             return;
         }
 
-        IdentityProviderModel existing = realm.getIdentityProvidersStream()
-                .filter(p -> Objects.equals(p.getAlias(), representation.getAlias()) || Objects.equals(p.getInternalId(), representation.getInternalId()))
-                .findFirst().orElse(null);
-        String orgId = existing == null ? representation.getConfig().get(OrganizationModel.ORGANIZATION_ATTRIBUTE) : existing.getOrganizationId();
+        IdentityProviderModel existing = Optional.ofNullable(session.identityProviders().getByAlias(representation.getAlias()))
+                        .orElse(session.identityProviders().getById(representation.getInternalId()));
+        String repOrgId = representation.getOrganizationId() != null ? representation.getOrganizationId() :
+                representation.getConfig().remove(OrganizationModel.ORGANIZATION_ATTRIBUTE);
+        String orgId = existing != null ? existing.getOrganizationId() : repOrgId;
 
         if (orgId != null) {
             OrganizationProvider provider = session.getProvider(OrganizationProvider.class);
             OrganizationModel org = provider.getById(orgId);
-            String newOrgId = representation.getConfig().get(OrganizationModel.ORGANIZATION_ATTRIBUTE);
 
-            if (org == null || (newOrgId != null && provider.getById(newOrgId) == null)) {
+            if (org == null || (repOrgId != null && provider.getById(repOrgId) == null)) {
                 throw new IllegalArgumentException("Organization associated with broker does not exist");
             }
 
@@ -1669,7 +1674,31 @@ public class RepresentationToModel {
             }
 
             // make sure the link to an organization does not change
-            representation.getConfig().put(OrganizationModel.ORGANIZATION_ATTRIBUTE, orgId);
+            representation.setOrganizationId(orgId);
         }
+    }
+
+    public static OrganizationModel toModel(OrganizationRepresentation rep, OrganizationModel model) {
+        if (rep == null) {
+            return null;
+        }
+
+        model.setName(rep.getName());
+        model.setAlias(rep.getAlias());
+        model.setEnabled(rep.isEnabled());
+        model.setRedirectUrl(rep.getRedirectUrl());
+        model.setDescription(rep.getDescription());
+        model.setAttributes(rep.getAttributes());
+        model.setDomains(ofNullable(rep.getDomains()).orElse(Set.of()).stream()
+                .filter(Objects::nonNull)
+                .filter(domain -> StringUtil.isNotBlank(domain.getName()))
+                .map(RepresentationToModel::toModel)
+                .collect(Collectors.toSet()));
+
+        return model;
+    }
+
+    public static OrganizationDomainModel toModel(OrganizationDomainRepresentation domainRepresentation) {
+        return new OrganizationDomainModel(domainRepresentation.getName(), domainRepresentation.isVerified());
     }
 }

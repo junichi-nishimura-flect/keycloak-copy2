@@ -28,12 +28,12 @@ import org.keycloak.common.util.Time;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.admin.OperationType;
+import org.keycloak.events.admin.ResourceType;
 import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.OrganizationModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.organization.OrganizationProvider;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
 import org.keycloak.protocol.oidc.utils.OIDCResponseType;
@@ -52,7 +52,6 @@ public class OrganizationInvitationResource {
 
     private final KeycloakSession session;
     private final RealmModel realm;
-    private final OrganizationProvider provider;
     private final OrganizationModel organization;
     private final AdminEventBuilder adminEvent;
     private final int tokenExpiration;
@@ -60,9 +59,8 @@ public class OrganizationInvitationResource {
     public OrganizationInvitationResource(KeycloakSession session, OrganizationModel organization, AdminEventBuilder adminEvent) {
         this.session = session;
         this.realm = session.getContext().getRealm();
-        this.provider = session.getProvider(OrganizationProvider.class);
         this.organization = organization;
-        this.adminEvent = adminEvent;
+        this.adminEvent = adminEvent.resource(ResourceType.ORGANIZATION_MEMBERSHIP);
         this.tokenExpiration = getTokenExpiration();
     }
 
@@ -74,17 +72,11 @@ public class OrganizationInvitationResource {
         UserModel user = session.users().getUserByEmail(realm, email);
 
         if (user != null) {
-            OrganizationModel org = provider.getByMember(user);
-
-            if (org != null && org.equals(organization)) {
+            if (organization.isMember(user)) {
                 throw ErrorResponse.error("User already a member of the organization", Status.CONFLICT);
             }
 
             return sendInvitation(user);
-        }
-
-        if (!realm.isRegistrationAllowed()) {
-            throw ErrorResponse.error("Realm does not allow self-registration", Status.BAD_REQUEST);
         }
 
         user = new InMemoryUserAdapter(session, realm, null);
@@ -153,8 +145,11 @@ public class OrganizationInvitationResource {
 
         token.setOrgId(organization.getId());
 
-        String redirectUri = Urls.accountBase(session.getContext().getUri().getBaseUri()).path("/").build(realm.getName()).toString();
-        token.setRedirectUri(redirectUri);
+        if (organization.getRedirectUrl() == null || organization.getRedirectUrl().isBlank()) {
+            token.setRedirectUri(Urls.accountBase(session.getContext().getUri().getBaseUri()).path("/").build(realm.getName()).toString());
+        } else {
+            token.setRedirectUri(organization.getRedirectUrl());
+        }
 
         return token.serialize(session, realm, session.getContext().getUri());
     }

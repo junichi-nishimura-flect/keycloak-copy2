@@ -1,5 +1,6 @@
 package org.keycloak.guides.maven;
 
+import static org.aesh.readline.terminal.Key.r;
 import static org.keycloak.quarkus.runtime.configuration.Configuration.OPTION_PART_SEPARATOR;
 import static org.keycloak.quarkus.runtime.configuration.Configuration.toDashCase;
 import static org.keycloak.quarkus.runtime.configuration.MicroProfileConfigProvider.NS_KEYCLOAK_PREFIX;
@@ -50,6 +51,7 @@ public class Options {
                         m.getDescription(),
                         m.getDefaultValue().map(Object::toString).orElse(null),
                         m.getExpectedValues(),
+                        m.isStrictExpectedValues(),
                         m.getEnabledWhen().orElse(""),
                         m.getDeprecatedMetadata().orElse(null)))
                 .forEach(o -> options.computeIfAbsent(o.category, k -> new TreeSet<>(Comparator.comparing(Option::getKey))).add(o));
@@ -76,6 +78,7 @@ public class Options {
                                 m.getHelpText(),
                                 m.getDefaultValue() == null ? null : m.getDefaultValue().toString(),
                                 m.getOptions() == null ? Collections.emptyList() : m.getOptions(),
+                                true,
                                 "",
                                 null))
                         .sorted(Comparator.comparing(Option::getKey)).collect(Collectors.toList());
@@ -144,16 +147,25 @@ public class Options {
                 .orElseGet(Collections::emptySet);
     }
 
-    public List<Option> getOptions(String includeOptions, String deniedCategories) {
-        final String r = includeOptions.replaceAll("\\.", "\\\\.").replaceAll("\\*", ".*").replace(' ', '|');
+    public List<Option> getOptions(String includeOptions, String excludedOptions, String deniedCategories) {
+        final String include = replaceSpecialCharsInOptions(includeOptions);
+        final String exclude = replaceSpecialCharsInOptions(excludedOptions);
         final Set<OptionCategory> denied = getDeniedCategories(deniedCategories);
 
         return options.values()
                 .stream()
                 .flatMap(Collection::stream)
                 .filter(f -> !denied.contains(f.category))
-                .filter(f -> f.getKey().matches(r))
+                .filter(f -> f.getKey().matches(include) && (exclude == null || !f.getKey().matches(exclude)))
                 .toList();
+    }
+
+    private String replaceSpecialCharsInOptions(String options) {
+        if (options != null) {
+            return options.replaceAll("\\.", "\\\\.").replaceAll("\\*", ".*").replace(' ', '|');
+        } else {
+            return null;
+        }
     }
 
     public Map<String, Map<String, List<Option>>> getProviderOptions() {
@@ -169,6 +181,9 @@ public class Options {
         private String description;
         private final String defaultValue;
         private List<String> expectedValues;
+
+        private final boolean strictExpectedValues;
+
         private final String enabledWhen;
         private final DeprecatedMetadata deprecated;
 
@@ -179,6 +194,7 @@ public class Options {
                       String description,
                       String defaultValue,
                       Iterable<String> expectedValues,
+                      boolean strictExpectedValues,
                       String enabledWhen,
                       DeprecatedMetadata deprecatedMetadata) {
             this.key = key;
@@ -188,6 +204,7 @@ public class Options {
             this.description = description;
             this.defaultValue = defaultValue;
             this.expectedValues = StreamSupport.stream(expectedValues.spliterator(), false).collect(Collectors.toList());
+            this.strictExpectedValues = strictExpectedValues;
             this.enabledWhen = enabledWhen;
             this.deprecated = deprecatedMetadata;
         }
@@ -237,6 +254,10 @@ public class Options {
 
         public List<String> getExpectedValues() {
             return expectedValues;
+        }
+
+        public boolean isStrictExpectedValues() {
+            return strictExpectedValues;
         }
 
         public String getEnabledWhen() {

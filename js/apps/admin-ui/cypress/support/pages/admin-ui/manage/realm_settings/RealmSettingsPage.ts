@@ -11,9 +11,10 @@ enum RealmSettingsTab {
 
 const expect = chai.expect;
 export default class RealmSettingsPage extends CommonPage {
-  generalSaveBtn = "general-tab-save";
-  generalRevertBtn = "general-tab-revert";
+  generalSaveBtn = "realmSettingsGeneralTab-save";
+  generalRevertBtn = "realmSettingsGeneralTab-revert";
   themesSaveBtn = "themes-tab-save";
+  sessionsSaveBtn = "sessions-tab-save";
   loginTab = "rs-login-tab";
   emailTab = "rs-email-tab";
   themesTab = "rs-themes-tab";
@@ -206,7 +207,7 @@ export default class RealmSettingsPage extends CommonPage {
   #availablePeriodExecutorFld = "available-period";
   #editExecutorBtn =
     '[aria-label="Executors"] > li > div:first-child [data-testid="editExecutor"]';
-  #executorAvailablePeriodInput = "#available-period";
+  #executorAvailablePeriodInput = "[data-testid='available-period']";
 
   #listingPage = new ListingPage();
   #addCondition = "addCondition";
@@ -398,6 +399,12 @@ export default class RealmSettingsPage extends CommonPage {
 
   saveThemes() {
     cy.findByTestId(this.themesSaveBtn).click();
+
+    return this;
+  }
+
+  saveSessions() {
+    cy.findByTestId(this.sessionsSaveBtn).click();
 
     return this;
   }
@@ -707,6 +714,11 @@ export default class RealmSettingsPage extends CommonPage {
         expect(event).to.contain(user);
       }
     });
+    return this;
+  }
+
+  setOfflineSessionMaxSwitch(value: boolean) {
+    this.setSwitch(this.offlineSessionMaxSwitch, value);
     return this;
   }
 

@@ -60,7 +60,8 @@ public class IgnoredArtifacts {
             "org.keycloak:keycloak-crypto-fips1402",
             "org.bouncycastle:bc-fips",
             "org.bouncycastle:bctls-fips",
-            "org.bouncycastle:bcpkix-fips"
+            "org.bouncycastle:bcpkix-fips",
+            "org.bouncycastle:bcutil-fips"
     );
 
     private static Set<String> fips() {
@@ -158,9 +159,7 @@ public class IgnoredArtifacts {
     );
 
     private static Set<String> health() {
-        boolean isHealthEnabled = Configuration.getOptionalBooleanValue(
-                MicroProfileConfigProvider.NS_KEYCLOAK_PREFIX + HealthOptions.HEALTH_ENABLED.getKey()).orElse(false);
-
+        boolean isHealthEnabled = Configuration.isTrue(HealthOptions.HEALTH_ENABLED);
         return !isHealthEnabled ? HEALTH : emptySet();
     }
 
@@ -173,9 +172,7 @@ public class IgnoredArtifacts {
     );
 
     private static Set<String> metrics() {
-        boolean isMetricsEnabled = Configuration.getOptionalBooleanValue(
-                MicroProfileConfigProvider.NS_KEYCLOAK_PREFIX + MetricsOptions.METRICS_ENABLED.getKey()).orElse(false);
-
+        boolean isMetricsEnabled = Configuration.isTrue(MetricsOptions.METRICS_ENABLED);
         return !isMetricsEnabled ? METRICS : emptySet();
     }
 }
