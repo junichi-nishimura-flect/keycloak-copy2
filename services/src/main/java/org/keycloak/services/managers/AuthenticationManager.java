@@ -958,14 +958,7 @@ public class AuthenticationManager {
     public static Response nextActionAfterAuthentication(KeycloakSession session, AuthenticationSessionModel authSession,
                                                   ClientConnection clientConnection,
                                                   HttpRequest request, UriInfo uriInfo, EventBuilder event) {
-        return nextActionAfterAuthentication(session, authSession, clientConnection, request, uriInfo, event, new HashSet<>());
-    }
-
-    private static Response nextActionAfterAuthentication(KeycloakSession session, AuthenticationSessionModel authSession,
-                                                  ClientConnection clientConnection,
-                                                  HttpRequest request, UriInfo uriInfo, EventBuilder event,
-                                                  Set<String> ignoredActions) {
-        Response requiredAction = actionRequired(session, authSession, request, event, ignoredActions);
+        Response requiredAction = actionRequired(session, authSession, request, event);
         if (requiredAction != null) return requiredAction;
         return finishedRequiredActions(session, authSession, null, clientConnection, request, uriInfo, event);
 
@@ -1048,7 +1041,7 @@ public class AuthenticationManager {
         final var realm = authSession.getRealm();
         final var user = authSession.getAuthenticatedUser();
 
-        evaluateRequiredActionTriggers(session, authSession, request, event, realm, user, new HashSet<>());
+        evaluateRequiredActionTriggers(session, authSession, request, event, realm, user);
 
         final var kcAction = authSession.getClientNote(Constants.KC_ACTION);
         final var nextApplicableAction =
@@ -1100,21 +1093,17 @@ public class AuthenticationManager {
         }
     }
 
+
     public static Response actionRequired(final KeycloakSession session, final AuthenticationSessionModel authSession,
             final HttpRequest request, final EventBuilder event) {
-        return actionRequired(session, authSession, request, event, new HashSet<>());
-    }
-
-    private static Response actionRequired(final KeycloakSession session, final AuthenticationSessionModel authSession,
-            final HttpRequest request, final EventBuilder event, Set<String> ignoredActions) {
         final var realm = authSession.getRealm();
         final var user = authSession.getAuthenticatedUser();
 
-        evaluateRequiredActionTriggers(session, authSession, request, event, realm, user, ignoredActions);
+        evaluateRequiredActionTriggers(session, authSession, request, event, realm, user);
 
         event.detail(Details.CODE_ID, authSession.getParentSession().getId());
 
-        final var actionResponse = executionActions(session, authSession, request, event, realm, user, ignoredActions);
+        final var actionResponse = executionActions(session, authSession, request, event, realm, user);
         if (actionResponse != null) {
             return actionResponse;
         }
@@ -1229,22 +1218,21 @@ public class AuthenticationManager {
 
 
     protected static Response executionActions(KeycloakSession session, AuthenticationSessionModel authSession,
-            HttpRequest request, EventBuilder event, RealmModel realm, UserModel user, Set<String> ignoredActions) {
+            HttpRequest request, EventBuilder event, RealmModel realm, UserModel user) {
         final var kcAction = authSession.getClientNote(Constants.KC_ACTION);
         final var firstApplicableRequiredAction =
                 getFirstApplicableRequiredAction(realm, authSession, user, kcAction);
 
         if (firstApplicableRequiredAction != null) {
             return executeAction(session, authSession, firstApplicableRequiredAction, request, event, realm, user,
-                    kcAction != null, ignoredActions);
+                    kcAction != null);
         }
 
         return null;
     }
 
     private static Response executeAction(KeycloakSession session, AuthenticationSessionModel authSession, RequiredActionProviderModel model,
-                                          HttpRequest request, EventBuilder event, RealmModel realm, UserModel user, boolean kcActionExecution,
-                                          Set<String> ignoredActions) {
+                                          HttpRequest request, EventBuilder event, RealmModel realm, UserModel user, boolean kcActionExecution) {
         RequiredActionFactory factory = (RequiredActionFactory) session.getKeycloakSessionFactory()
                 .getProviderFactory(RequiredActionProvider.class, model.getProviderId());
         if (factory == null) {
@@ -1291,20 +1279,12 @@ public class AuthenticationManager {
             authSession.setAuthNote(AuthenticationProcessor.CURRENT_AUTHENTICATION_EXECUTION, model.getProviderId());
             return context.getChallenge();
         }
-        else if (context.getStatus() == RequiredActionContext.Status.IGNORE) {
-            authSession.getAuthenticatedUser().removeRequiredAction(factory.getId());
-            authSession.removeRequiredAction(factory.getId());
-            setKcActionStatus(factory.getId(), RequiredActionContext.KcActionStatus.SUCCESS, authSession);
-            ignoredActions.add(factory.getId());
-            return nextActionAfterAuthentication(session, authSession, session.getContext().getConnection(), request, session.getContext().getUri(), event, ignoredActions);
-        }
         else if (context.getStatus() == RequiredActionContext.Status.SUCCESS) {
             event.clone().event(EventType.CUSTOM_REQUIRED_ACTION).detail(Details.CUSTOM_REQUIRED_ACTION, factory.getId()).success();
             // don't have to perform the same action twice, so remove it from both the user and session required actions
             authSession.getAuthenticatedUser().removeRequiredAction(factory.getId());
             authSession.removeRequiredAction(factory.getId());
             setKcActionStatus(factory.getId(), RequiredActionContext.KcActionStatus.SUCCESS, authSession);
-            return nextActionAfterAuthentication(session, authSession, session.getContext().getConnection(), request, session.getContext().getUri(), event, ignoredActions);
         }
 
         return null;
@@ -1390,16 +1370,9 @@ public class AuthenticationManager {
     public static void evaluateRequiredActionTriggers(final KeycloakSession session, final AuthenticationSessionModel authSession,
                                                       final HttpRequest request, final EventBuilder event,
                                                       final RealmModel realm, final UserModel user) {
-        evaluateRequiredActionTriggers(session, authSession, request, event, realm, user, new HashSet<>());
-    }
-
-    private static void evaluateRequiredActionTriggers(final KeycloakSession session, final AuthenticationSessionModel authSession,
-                                                      final HttpRequest request, final EventBuilder event,
-                                                      final RealmModel realm, final UserModel user, Set<String> ignoredActions) {
         // see if any required actions need triggering, i.e. an expired password
         realm.getRequiredActionProvidersStream()
                 .filter(RequiredActionProviderModel::isEnabled)
-                .filter(model -> !ignoredActions.contains(model.getProviderId()))
                 .map(model -> toRequiredActionFactory(session, model, realm))
                 .filter(Objects::nonNull)
                 .forEachOrdered(f -> evaluateRequiredAction(session, authSession, request, event, realm, user, f));
