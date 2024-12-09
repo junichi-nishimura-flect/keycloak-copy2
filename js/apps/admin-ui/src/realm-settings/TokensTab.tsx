@@ -126,9 +126,7 @@ export const RealmSettingsTokensTab = ({
                       selected={p === field.value}
                       key={`default-sig-alg-${idx}`}
                       value={p}
-                    >
-                      {p}
-                    </SelectOption>
+                    ></SelectOption>
                   ))}
                 </KeycloakSelect>
               )}
