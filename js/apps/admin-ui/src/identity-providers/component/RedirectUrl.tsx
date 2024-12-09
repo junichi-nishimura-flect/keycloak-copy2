@@ -1,16 +1,18 @@
 import { ClipboardCopy, FormGroup } from "@patternfly/react-core";
 import { useTranslation } from "react-i18next";
-import { HelpItem, useEnvironment } from "@keycloak/keycloak-ui-shared";
+import { HelpItem } from "@keycloak/keycloak-ui-shared";
+import { useAdminClient } from "../../admin-client";
 import { useRealm } from "../../context/realm-context/RealmContext";
 import { addTrailingSlash } from "../../util";
 
 export const RedirectUrl = ({ id }: { id: string }) => {
-  const { environment } = useEnvironment();
+  const { adminClient } = useAdminClient();
+
   const { t } = useTranslation();
 
   const { realm } = useRealm();
   const callbackUrl = `${addTrailingSlash(
-    environment.serverBaseUrl,
+    adminClient.baseUrl,
   )}realms/${realm}/broker`;
 
   return (
