@@ -244,7 +244,9 @@ export default function AuthenticationSection() {
                 {
                   name: "usedBy",
                   displayKey: "usedBy",
-                  cellRenderer: (row) => <UsedBy authType={row} />,
+                  cellRenderer: (row) => (
+                    <UsedBy authType={row} realm={realm} />
+                  ),
                 },
                 {
                   name: "description",
