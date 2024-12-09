@@ -14,7 +14,6 @@ export default class RealmSettingsPage extends CommonPage {
   generalSaveBtn = "general-tab-save";
   generalRevertBtn = "general-tab-revert";
   themesSaveBtn = "themes-tab-save";
-  sessionsSaveBtn = "sessions-tab-save";
   loginTab = "rs-login-tab";
   emailTab = "rs-email-tab";
   themesTab = "rs-themes-tab";
@@ -403,12 +402,6 @@ export default class RealmSettingsPage extends CommonPage {
     return this;
   }
 
-  saveSessions() {
-    cy.findByTestId(this.sessionsSaveBtn).click();
-
-    return this;
-  }
-
   addSenderEmail(senderEmail: string) {
     this.getFromInput().clear();
 
@@ -714,11 +707,6 @@ export default class RealmSettingsPage extends CommonPage {
         expect(event).to.contain(user);
       }
     });
-    return this;
-  }
-
-  setOfflineSessionMaxSwitch(value: boolean) {
-    this.setSwitch(this.offlineSessionMaxSwitch, value);
     return this;
   }
 
