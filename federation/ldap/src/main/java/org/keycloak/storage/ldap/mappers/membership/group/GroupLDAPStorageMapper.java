@@ -194,15 +194,13 @@ public class GroupLDAPStorageMapper extends AbstractLDAPStorageMapper implements
         return syncResult;
     }
 
-    private void syncExistingGroup(RealmModel realm, GroupModel kcExistingGroup, Map.Entry<String, LDAPObject> groupEntry,
+    private void syncExistingGroup(GroupModel kcExistingGroup, Map.Entry<String, LDAPObject> groupEntry,
                                    SynchronizationResult syncResult, Set<String> visitedGroupIds, String groupName) {
         try {
             // Update each existing group to be synced in its own inner transaction to prevent race condition when
             // the groups intended to be updated was already deleted via other channel in the meantime
             KeycloakModelUtils.runJobInTransaction(ldapProvider.getSession().getKeycloakSessionFactory(), session -> {
-                RealmModel innerTransactionRealm = session.realms().getRealm(realm.getId());
-                GroupModel innerTransactionGroup = session.groups().getGroupById(innerTransactionRealm, kcExistingGroup.getId());
-                updateAttributesOfKCGroup(innerTransactionGroup, groupEntry.getValue());
+                updateAttributesOfKCGroup(kcExistingGroup, groupEntry.getValue());
                 syncResult.increaseUpdated();
                 visitedGroupIds.add(kcExistingGroup.getId());
             });
@@ -280,9 +278,9 @@ public class GroupLDAPStorageMapper extends AbstractLDAPStorageMapper implements
                     GroupModel kcExistingGroup = transactionGroupPathGroups.get(groupName);
 
                     if (kcExistingGroup != null) {
-                        syncExistingGroup(currentRealm, kcExistingGroup, groupEntry, syncResult, visitedGroupIds, groupName);
+                        syncExistingGroup(kcExistingGroup, groupEntry, syncResult, visitedGroupIds, groupName);
                     } else {
-                        syncNonExistingGroup(currentRealm, groupEntry, syncResult, visitedGroupIds, groupName);
+                        syncNonExistingGroup(realm, groupEntry, syncResult, visitedGroupIds, groupName);
                     }
                 }
             });
